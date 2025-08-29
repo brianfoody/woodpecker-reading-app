@@ -9,7 +9,10 @@ import {
   playAudioBlob,
   type WordAudio,
 } from "@/lib/audio";
-import { loadPreGeneratedAudio, initializeCacheWithPreGeneratedAudio } from "@/lib/preload-audio";
+import {
+  loadPreGeneratedAudio,
+  initializeCacheWithPreGeneratedAudio,
+} from "@/lib/preload-audio";
 
 export default function ReadingApp() {
   const [sentence, setSentence] = useState("The silly monkey lost his banana");
@@ -39,11 +42,11 @@ export default function ReadingApp() {
       try {
         // First try to load pregenerated audio
         const preGeneratedAudio = await loadPreGeneratedAudio();
-        
+
         if (preGeneratedAudio && preGeneratedAudio.length > 0) {
           console.log("Using pregenerated audio files");
           setWordAudios(preGeneratedAudio);
-          
+
           // Also initialize the cache with these files
           await initializeCacheWithPreGeneratedAudio();
         } else {
@@ -450,6 +453,29 @@ export default function ReadingApp() {
           <p className="text-base md:text-lg lg:text-xl text-neutral-600">
             {words.length} {words.length === 1 ? "word" : "words"}
           </p>
+        </div>
+
+        {/* Call to Action */}
+        <div className="mt-12 md:mt-16 text-center">
+          <div className="inline-block">
+            <p className="text-lg md:text-xl text-neutral-700 mb-2">
+              Want to create magical learning experiences for your child?
+            </p>
+            <a
+              href="https://woodpeckeros.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-xl md:text-2xl text-emerald-600 hover:text-emerald-700 font-bold transition-all duration-300 hover:scale-105 group"
+            >
+              Join the Woodpecker Revolution
+              <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+                →
+              </span>
+            </a>
+            <p className="text-sm md:text-base text-neutral-500 mt-2">
+              Build personalized games that grow with them. 🌱
+            </p>
+          </div>
         </div>
       </div>
     </div>
