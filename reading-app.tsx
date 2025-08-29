@@ -122,9 +122,10 @@ export default function ReadingApp() {
         if (!shouldContinue) break;
 
         setActiveWord(index);
-        // Find the audio for this word
+        // Strip punctuation and find the audio for this word
+        const cleanWord = words[index].replace(/[.,!?;:'"'()\[\]{}]/g, "");
         const wordAudio = wordAudios.find(
-          (wa) => wa.word.toLowerCase() === words[index].toLowerCase()
+          (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
         );
         if (wordAudio) {
           try {
@@ -151,15 +152,20 @@ export default function ReadingApp() {
   );
 
   const handleWordTap = useCallback(
-    async (index: number, word: string) => {
+    async (index: number, word: string, e?: React.MouseEvent) => {
+      // Prevent onClick if this was triggered by a touch event
+      if (e && e.defaultPrevented) return;
       if (isCreating) return; // Only prevent during creation
 
       // Allow tapping even if another word is playing
       setActiveWord(index);
 
+      // Strip punctuation from the word before finding audio
+      const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
+
       // Find the audio for this word
       const wordAudio = wordAudios.find(
-        (wa) => wa.word.toLowerCase() === word.toLowerCase()
+        (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
       );
       if (wordAudio) {
         try {
@@ -233,15 +239,38 @@ export default function ReadingApp() {
   const handlePointerEnd = useCallback(async () => {
     if (isSwiping) {
       // Only process if a swipe was active
-      if (swipeWords.length > 0) {
-        // Play audio sequence with animation
+      if (swipeWords.length > 1) {
+        // Multiple words - play sequence
         animateWordSequence(swipeWords);
+      } else if (swipeWords.length === 1) {
+        // Single tap - play the word
+        const index = swipeWords[0];
+        const word = words[index];
+        if (word) {
+          setActiveWord(index);
+          
+          // Strip punctuation from the word before finding audio
+          const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
+          
+          const wordAudio = wordAudios.find(
+            (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
+          );
+          if (wordAudio) {
+            try {
+              playAudioBlob(wordAudio.audio).then(() => {
+                setActiveWord((current) => (current === index ? null : current));
+              });
+            } catch (error) {
+              console.error("Error playing word audio:", error);
+            }
+          }
+        }
       }
       setPointerStart(null);
       setIsSwiping(false); // End the swipe gesture
       setTimeout(() => setSwipeWords([]), 500); // Clear swiped words after a short delay
     }
-  }, [swipeWords, isSwiping, animateWordSequence]);
+  }, [swipeWords, isSwiping, animateWordSequence, words, wordAudios]);
 
   return (
     <div className="min-h-screen bg-neutral-50 p-4 md:p-6 lg:p-8 flex items-center justify-center">
@@ -401,7 +430,7 @@ export default function ReadingApp() {
                         `}
                         onTouchStart={(e) => handlePointerStart(e, index)}
                         onMouseDown={(e) => handlePointerStart(e, index)}
-                        onClick={() => handleWordTap(index, word)}
+                        onClick={(e) => handleWordTap(index, word, e)}
                         animate={{
                           scale: activeWord === index ? 1.1 : 1,
                           y: activeWord === index ? -4 : 0,
@@ -430,7 +459,7 @@ export default function ReadingApp() {
                               : ""
                           }
                         `}
-                        onClick={() => handleWordTap(index, word)}
+                        onClick={(e) => handleWordTap(index, word, e)}
                         animate={{
                           scale: activeWord === index ? 1.4 : 1,
                         }}
