@@ -16,6 +16,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Log the request details
+    const timestamp = new Date().toISOString();
+    const userAgent = request.headers.get("user-agent") || "unknown";
+    const ip = request.headers.get("x-forwarded-for") || 
+                request.headers.get("x-real-ip") || 
+                "unknown";
+    
+    console.log(`[${timestamp}] Audio Request:`, {
+      text,
+      length: text.length,
+      ip,
+      userAgent,
+    });
+
     if (!process.env.GROQ_API_KEY) {
       return NextResponse.json(
         { error: "GROQ API key is not configured" },

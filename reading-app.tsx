@@ -28,8 +28,7 @@ export default function ReadingApp() {
   const [swipeWords, setSwipeWords] = useState<number[]>([]);
   const [isAnimating, setIsAnimating] = useState(false); // Controls overall animation state (tap or sequence)
   const [isSwiping, setIsSwiping] = useState(false); // Controls if a swipe gesture is active (pointer down and moving)
-  const [lastPlayedTime, setLastPlayedTime] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [lastPlayedWord, setLastPlayedWord] = useState<{index: number, time: number} | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pointerStart, setPointerStart] = useState<{
@@ -160,9 +159,6 @@ export default function ReadingApp() {
       e.preventDefault(); // Prevent browser scroll/selection
       e.stopPropagation(); // Stop event propagation to prevent any click events
       if (isCreating) return; // Only prevent during creation
-      
-      // Prevent if audio is currently playing
-      if (isPlaying) return;
 
       // Allow starting new swipe even if animation is playing
       const coords = getClientCoords(e);
@@ -171,7 +167,7 @@ export default function ReadingApp() {
       setIsSwiping(true); // Indicate that a swipe gesture has started
       setIsAnimating(false); // Cancel any ongoing animation
     },
-    [isCreating, isPlaying]
+    [isCreating]
   );
 
   const handlePointerMove = useCallback(
@@ -212,29 +208,29 @@ export default function ReadingApp() {
 
   const handlePointerEnd = useCallback(async () => {
     if (isSwiping) {
-      // Debounce - prevent playing if audio was just played
       const now = Date.now();
-      if (now - lastPlayedTime < 300 || isPlaying) {
-        // Reset state but don't play
-        setPointerStart(null);
-        setIsSwiping(false);
-        setTimeout(() => setSwipeWords([]), 500);
-        return;
-      }
       
       // Only process if a swipe was active
       if (swipeWords.length > 1) {
         // Multiple words - play sequence
-        setLastPlayedTime(now);
         animateWordSequence(swipeWords);
       } else if (swipeWords.length === 1) {
         // Single tap - play the word
         const index = swipeWords[0];
+        
+        // Prevent double-tap on the same word within 300ms
+        if (lastPlayedWord && lastPlayedWord.index === index && (now - lastPlayedWord.time) < 300) {
+          // Reset state but don't play
+          setPointerStart(null);
+          setIsSwiping(false);
+          setTimeout(() => setSwipeWords([]), 500);
+          return;
+        }
+        
         const word = words[index];
         if (word) {
           setActiveWord(index);
-          setLastPlayedTime(now);
-          setIsPlaying(true);
+          setLastPlayedWord({index, time: now});
           
           // Strip punctuation from the word before finding audio
           const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
@@ -246,16 +242,10 @@ export default function ReadingApp() {
             try {
               playAudioBlob(wordAudio.audio).then(() => {
                 setActiveWord((current) => (current === index ? null : current));
-                setIsPlaying(false);
-              }).catch(() => {
-                setIsPlaying(false);
               });
             } catch (error) {
               console.error("Error playing word audio:", error);
-              setIsPlaying(false);
             }
-          } else {
-            setIsPlaying(false);
           }
         }
       }
@@ -263,7 +253,7 @@ export default function ReadingApp() {
       setIsSwiping(false); // End the swipe gesture
       setTimeout(() => setSwipeWords([]), 500); // Clear swiped words after a short delay
     }
-  }, [swipeWords, isSwiping, animateWordSequence, words, wordAudios, lastPlayedTime, isPlaying]);
+  }, [swipeWords, isSwiping, animateWordSequence, words, wordAudios, lastPlayedWord]);
 
   return (
     <div className="min-h-screen bg-neutral-50 p-4 md:p-6 lg:p-8 flex items-center justify-center">
@@ -332,15 +322,11 @@ export default function ReadingApp() {
             backgroundImage: `radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
                              radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%)`,
           }}
-          onTouchMove={(e) => {
-            if (!isPlaying) handlePointerMove(e);
-          }}
+          onTouchMove={handlePointerMove}
           onTouchEnd={(e) => {
-            if (!isPlaying) {
-              e.preventDefault();
-              e.stopPropagation();
-              handlePointerEnd();
-            }
+            e.preventDefault();
+            e.stopPropagation();
+            handlePointerEnd();
           }}
           onMouseMove={handlePointerMove}
           onMouseUp={handlePointerEnd}
@@ -429,12 +415,8 @@ export default function ReadingApp() {
                               : ""
                           }
                         `}
-                        onTouchStart={(e) => {
-                          if (!isPlaying) handlePointerStart(e, index);
-                        }}
-                        onMouseDown={(e) => {
-                          if (!isPlaying) handlePointerStart(e, index);
-                        }}
+                        onTouchStart={(e) => handlePointerStart(e, index)}
+                        onMouseDown={(e) => handlePointerStart(e, index)}
                         animate={{
                           scale: activeWord === index ? 1.1 : 1,
                           y: activeWord === index ? -4 : 0,
