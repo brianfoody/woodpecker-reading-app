@@ -282,6 +282,84 @@ const clearAudioCache = async (): Promise<void> => {
   await cache.clear();
 };
 
+/**
+ * Play a single word's audio
+ * @param word The word to play
+ * @returns Promise that resolves when audio finishes playing
+ */
+const playWord = async (word: string): Promise<void> => {
+  const cache = await getAudioCache();
+  
+  // Check cache first
+  let audioBlob = await cache.getWord(word);
+  
+  if (!audioBlob) {
+    // Generate audio if not cached
+    try {
+      audioBlob = await createAudioFile(word);
+      // Store in cache for future use
+      await cache.setWord(word, audioBlob);
+    } catch (error) {
+      console.error(`Failed to generate audio for word: ${word}`, error);
+      return; // Exit if audio generation fails
+    }
+  }
+  
+  // Play the audio
+  await playAudioBlob(audioBlob);
+};
+
+/**
+ * Play multiple words with options for sequential or concurrent playback
+ * @param words Array of words to play
+ * @param options Playback options
+ * @returns Promise that resolves when all audio finishes playing
+ */
+interface PlayWordsOptions {
+  sequential?: boolean; // If true, plays words one after another. If false, plays all at once
+  delayMs?: number; // Delay between words (only applies when sequential is true)
+}
+
+const playWords = async (
+  words: string[], 
+  options: PlayWordsOptions = { sequential: true, delayMs: 100 }
+): Promise<void> => {
+  const cache = await getAudioCache();
+  
+  // Fetch/generate audio for all words
+  const wordAudioPromises = words.map(async (word) => {
+    let audioBlob = await cache.getWord(word);
+    
+    if (!audioBlob) {
+      try {
+        audioBlob = await createAudioFile(word);
+        await cache.setWord(word, audioBlob);
+      } catch (error) {
+        console.error(`Failed to generate audio for word: ${word}`, error);
+        return null;
+      }
+    }
+    
+    return { word, audio: audioBlob };
+  });
+  
+  const wordAudios = (await Promise.all(wordAudioPromises))
+    .filter((wa): wa is WordAudio => wa !== null);
+  
+  if (options.sequential) {
+    // Play words one after another with delay
+    for (const wordAudio of wordAudios) {
+      await playAudioBlob(wordAudio.audio);
+      if (options.delayMs && options.delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, options.delayMs));
+      }
+    }
+  } else {
+    // Play all words at once (concurrent)
+    await Promise.all(wordAudios.map(wa => playAudioBlob(wa.audio)));
+  }
+};
+
 // Export functions for use in the application
 export {
   createAudioFile,
@@ -290,6 +368,9 @@ export {
   playSentenceAudio,
   clearAudioCache,
   tokenizeSentence,
+  playWord,
+  playWords,
   type WordAudio,
-  type AudioCacheEntry
+  type AudioCacheEntry,
+  type PlayWordsOptions
 };
