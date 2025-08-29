@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Woodpecker - Reading practice",
-  description: "Created with v0",
+  description: "Created with Woodpecker",
   generator: "v0.app",
 };
 
