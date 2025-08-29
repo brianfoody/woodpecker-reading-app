@@ -22,7 +22,9 @@ class AudioCache {
 
   constructor() {
     // Generate a unique session ID
-    this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    this.sessionId = `session_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 11)}`;
   }
 
   async init(): Promise<void> {
@@ -53,10 +55,10 @@ class AudioCache {
     const transaction = this.db.transaction([this.storeName], "readwrite");
     const store = transaction.objectStore(this.storeName);
     const index = store.index("sessionId");
-    
+
     // Clear all entries that don't belong to current session
     const request = index.openCursor();
-    
+
     return new Promise((resolve) => {
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
@@ -102,7 +104,7 @@ class AudioCache {
         sessionId: this.sessionId,
         word: word.toLowerCase(),
         audioBlob: audioBlob,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       request.onerror = () => reject(request.error);
@@ -147,8 +149,9 @@ const getAudioCache = async (): Promise<AudioCache> => {
 // Initialize Groq client (API key should be set via environment variables in Next.js)
 const getGroqClient = () => {
   // In Next.js, use process.env for server-side or pass via API route
-  const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || process.env.GROQ_API_KEY;
-  
+  const apiKey =
+    process.env.NEXT_PUBLIC_GROQ_API_KEY || process.env.GROQ_API_KEY;
+
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured");
   }
@@ -156,7 +159,28 @@ const getGroqClient = () => {
   return new Groq({
     apiKey: apiKey,
     // For browser usage, might need to configure CORS or use via API route
-    dangerouslyAllowBrowser: true
+    dangerouslyAllowBrowser: true,
+  });
+};
+
+/**
+ * Get the duration of an audio blob in milliseconds
+ */
+const getAudioDuration = (blob: Blob): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    audio.addEventListener("loadedmetadata", () => {
+      const duration = audio.duration * 1000; // Convert to milliseconds
+      URL.revokeObjectURL(url);
+      resolve(duration);
+    });
+
+    audio.addEventListener("error", (error) => {
+      URL.revokeObjectURL(url);
+      reject(error);
+    });
   });
 };
 
@@ -166,18 +190,18 @@ const getGroqClient = () => {
 const tokenizeSentence = (sentence: string): string[] => {
   // Split by spaces while preserving punctuation attached to words
   const words = sentence.trim().split(/\s+/);
-  
+
   // Further process to separate words that might need individual audio
   const processedWords: string[] = [];
-  
-  words.forEach(word => {
+
+  words.forEach((word) => {
     // Remove punctuation for audio generation but keep the original for context
-    const cleanWord = word.replace(/[.,!?;:'"()[\]{}]/g, '');
+    const cleanWord = word.replace(/[.,!?;:'"()[\]{}]/g, "");
     if (cleanWord) {
       processedWords.push(cleanWord);
     }
   });
-  
+
   return processedWords;
 };
 
@@ -186,37 +210,37 @@ const tokenizeSentence = (sentence: string): string[] => {
  */
 const createAudioFile = async (text: string): Promise<Blob> => {
   const client = getGroqClient();
-  
+
   const response = await client.audio.speech.create({
     model: "playai-tts",
-    voice: "Quinn-PlayAI",
+    voice: "Jennifer-PlayAI",
     input: text,
     response_format: "wav",
   });
 
   // Convert response to Blob for browser compatibility
   const arrayBuffer = await response.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
-  
+  const blob = new Blob([arrayBuffer], { type: "audio/wav" });
+
   return blob;
 };
 
 /**
  * Breaks sentence up into words and in parallel creates an audio file for each word.
  * Caches words for reuse in future sentences.
- * 
+ *
  * @param sentence The sentence to generate audio for
- * @returns Array of word audio objects
+ * @returns Array of word audio objects with duration
  */
 const createSentenceAudio = async (sentence: string): Promise<WordAudio[]> => {
   const cache = await getAudioCache();
   const words = tokenizeSentence(sentence);
-  
+
   // Check cache and identify words that need generation
   const wordAudioPromises = words.map(async (word) => {
     // First check cache
     let audioBlob = await cache.getWord(word);
-    
+
     if (!audioBlob) {
       // Generate audio for uncached word
       try {
@@ -226,19 +250,29 @@ const createSentenceAudio = async (sentence: string): Promise<WordAudio[]> => {
       } catch (error) {
         console.error(`Failed to generate audio for word: ${word}`, error);
         // Return a silent audio blob or handle error appropriately
-        audioBlob = new Blob([], { type: 'audio/wav' });
+        audioBlob = new Blob([], { type: "audio/wav" });
       }
     }
-    
+
+    // Get the duration of the audio
+    let duration = 0;
+    try {
+      duration = await getAudioDuration(audioBlob);
+    } catch (error) {
+      console.error(`Failed to get duration for word: ${word}`, error);
+      duration = 500; // Default duration fallback
+    }
+
     return {
       word,
-      audio: audioBlob
+      audio: audioBlob,
+      duration,
     };
   });
-  
+
   // Execute all audio generation/retrieval in parallel
   const wordAudios = await Promise.all(wordAudioPromises);
-  
+
   return wordAudios;
 };
 
@@ -249,17 +283,17 @@ const playAudioBlob = (blob: Blob): Promise<void> => {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    
+
     audio.onended = () => {
       URL.revokeObjectURL(url);
       resolve();
     };
-    
+
     audio.onerror = (error) => {
       URL.revokeObjectURL(url);
       reject(error);
     };
-    
+
     audio.play().catch(reject);
   });
 };
@@ -267,11 +301,14 @@ const playAudioBlob = (blob: Blob): Promise<void> => {
 /**
  * Play words sequentially with a small delay between them
  */
-const playSentenceAudio = async (wordAudios: WordAudio[], delayMs: number = 100): Promise<void> => {
+const playSentenceAudio = async (
+  wordAudios: WordAudio[],
+  delayMs: number = 100
+): Promise<void> => {
   for (const wordAudio of wordAudios) {
     await playAudioBlob(wordAudio.audio);
     // Add small delay between words
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 };
 
@@ -290,10 +327,10 @@ const clearAudioCache = async (): Promise<void> => {
  */
 const playWord = async (word: string): Promise<void> => {
   const cache = await getAudioCache();
-  
+
   // Check cache first
   let audioBlob = await cache.getWord(word);
-  
+
   if (!audioBlob) {
     // Generate audio if not cached
     try {
@@ -305,7 +342,7 @@ const playWord = async (word: string): Promise<void> => {
       return; // Exit if audio generation fails
     }
   }
-  
+
   // Play the audio
   await playAudioBlob(audioBlob);
 };
@@ -322,15 +359,15 @@ interface PlayWordsOptions {
 }
 
 const playWords = async (
-  words: string[], 
+  words: string[],
   options: PlayWordsOptions = { sequential: true, delayMs: 100 }
 ): Promise<void> => {
   const cache = await getAudioCache();
-  
+
   // Fetch/generate audio for all words
   const wordAudioPromises = words.map(async (word) => {
     let audioBlob = await cache.getWord(word);
-    
+
     if (!audioBlob) {
       try {
         audioBlob = await createAudioFile(word);
@@ -340,24 +377,33 @@ const playWords = async (
         return null;
       }
     }
-    
-    return { word, audio: audioBlob };
+
+    // Get duration
+    let duration = 500; // Default fallback
+    try {
+      duration = await getAudioDuration(audioBlob);
+    } catch (error) {
+      console.error(`Failed to get duration for word: ${word}`, error);
+    }
+
+    return { word, audio: audioBlob, duration };
   });
-  
-  const wordAudios = (await Promise.all(wordAudioPromises))
-    .filter((wa): wa is WordAudio => wa !== null);
-  
+
+  const wordAudios = (await Promise.all(wordAudioPromises)).filter(
+    (wa): wa is WordAudio => wa !== null
+  );
+
   if (options.sequential) {
     // Play words one after another with delay
     for (const wordAudio of wordAudios) {
       await playAudioBlob(wordAudio.audio);
       if (options.delayMs && options.delayMs > 0) {
-        await new Promise(resolve => setTimeout(resolve, options.delayMs));
+        await new Promise((resolve) => setTimeout(resolve, options.delayMs));
       }
     }
   } else {
     // Play all words at once (concurrent)
-    await Promise.all(wordAudios.map(wa => playAudioBlob(wa.audio)));
+    await Promise.all(wordAudios.map((wa) => playAudioBlob(wa.audio)));
   }
 };
 
@@ -371,7 +417,8 @@ export {
   tokenizeSentence,
   playWord,
   playWords,
+  getAudioCache,
   type WordAudio,
   type AudioCacheEntry,
-  type PlayWordsOptions
+  type PlayWordsOptions,
 };

@@ -9,11 +9,12 @@ import {
   playAudioBlob,
   type WordAudio,
 } from "@/lib/audio";
+import { loadPreGeneratedAudio, initializeCacheWithPreGeneratedAudio } from "@/lib/preload-audio";
 
 export default function ReadingApp() {
-  const [sentence, setSentence] = useState("The brown mouse runs fast");
+  const [sentence, setSentence] = useState("The silly monkey lost his banana");
   const [inputSentence, setInputSentence] = useState(
-    "The brown mouse runs fast"
+    "The silly monkey lost his banana"
   );
   const [isCreating, setIsCreating] = useState(false);
   const [wordAudios, setWordAudios] = useState<WordAudio[]>([]);
@@ -36,8 +37,21 @@ export default function ReadingApp() {
     const loadInitialAudio = async () => {
       setIsInitializing(true);
       try {
-        const audios = await createSentenceAudio(sentence);
-        setWordAudios(audios);
+        // First try to load pregenerated audio
+        const preGeneratedAudio = await loadPreGeneratedAudio();
+        
+        if (preGeneratedAudio && preGeneratedAudio.length > 0) {
+          console.log("Using pregenerated audio files");
+          setWordAudios(preGeneratedAudio);
+          
+          // Also initialize the cache with these files
+          await initializeCacheWithPreGeneratedAudio();
+        } else {
+          // Fall back to generating audio via API
+          console.log("Generating audio via API");
+          const audios = await createSentenceAudio(sentence);
+          setWordAudios(audios);
+        }
       } catch (error) {
         console.error("Failed to load initial audio:", error);
       } finally {
@@ -113,12 +127,19 @@ export default function ReadingApp() {
           try {
             // Don't await, let audio play in background
             playAudioBlob(wordAudio.audio);
+            // Wait for the audio duration plus a small pause
+            await new Promise((resolve) =>
+              setTimeout(resolve, wordAudio.duration - 100)
+            );
           } catch (error) {
             console.error(`Failed to play word: ${words[index]}`, error);
+            // Fallback delay if audio fails
+            await new Promise((resolve) => setTimeout(resolve, 800));
           }
+        } else {
+          // Default delay if no audio found
+          await new Promise((resolve) => setTimeout(resolve, 800));
         }
-        // Longer delay between words for better comprehension when swiping
-        await new Promise((resolve) => setTimeout(resolve, 800));
         setActiveWord(null);
       }
       setIsAnimating(false);
@@ -220,34 +241,34 @@ export default function ReadingApp() {
   }, [swipeWords, isSwiping, animateWordSequence]);
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-8 flex items-center justify-center">
-      <div className="max-w-4xl w-full">
+    <div className="min-h-screen bg-neutral-50 p-4 md:p-6 lg:p-8 flex items-center justify-center">
+      <div className="max-w-7xl w-full">
         {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-2xl font-medium text-neutral-800 mb-2">
+        <div className="mb-8 md:mb-12">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-medium text-neutral-800 mb-2">
             Reading Practice
           </h1>
-          <p className="text-sm text-neutral-600">
+          <p className="text-base md:text-lg lg:text-xl text-neutral-600">
             Listen to words individually or in groups
           </p>
         </div>
 
         {/* Sentence Input */}
-        <div className="mb-10">
+        <div className="mb-8 md:mb-10">
           <label
             htmlFor="sentence-input"
-            className="block text-sm font-medium text-neutral-700 mb-3"
+            className="block text-base md:text-lg font-medium text-neutral-700 mb-3"
           >
             Enter sentence
           </label>
-          <div className="flex gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <input
               id="sentence-input"
               type="text"
               value={inputSentence}
               onChange={(e) => setInputSentence(e.target.value)}
               disabled={isCreating}
-              className="flex-1 px-4 py-3 bg-white border border-neutral-200 rounded-md text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex-1 px-5 py-4 md:px-6 md:py-4 bg-white border border-neutral-200 rounded-lg text-lg md:text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               placeholder="Type your sentence here"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !isCreating) {
@@ -259,7 +280,7 @@ export default function ReadingApp() {
               onClick={handleCreateSentence}
               disabled={isCreating || !inputSentence.trim()}
               className={`
-                px-6 py-3 rounded-md font-medium text-white text-base
+                px-8 py-4 md:px-10 md:py-4 rounded-lg font-medium text-white text-lg md:text-xl
                 transition-all duration-200 shadow-sm
                 ${
                   isCreating
@@ -279,7 +300,7 @@ export default function ReadingApp() {
         {/* Reading Area */}
         <div
           ref={containerRef}
-          className="bg-white rounded-xl border border-neutral-200 p-16 flex flex-col justify-center items-center overflow-hidden relative shadow-sm"
+          className="bg-white rounded-xl border border-neutral-200 p-6 md:p-8 lg:p-10 flex flex-col justify-center items-center overflow-hidden relative shadow-sm"
           style={{
             touchAction: "none", // Prevent browser scroll/zoom gestures
             minHeight: "400px",
@@ -354,14 +375,15 @@ export default function ReadingApp() {
                 transition={{ duration: 0.3 }}
               >
                 {/* Sentence */}
-                <div className="flex flex-wrap justify-center gap-x-8 gap-y-6 mb-12">
+                <div className="flex flex-wrap justify-center gap-x-4 md:gap-x-6 gap-y-6 md:gap-y-8 mb-12 px-4">
                   {words.map((word, index) => (
                     <div key={index} className="flex flex-col items-center">
                       {/* Word */}
                       <motion.div
                         data-word-index={index}
                         className={`
-                          text-3xl font-medium cursor-pointer select-none px-4 py-2 rounded-lg
+                          text-3xl md:text-4xl font-medium cursor-pointer select-none 
+                          px-3 md:px-4 py-2 md:py-3 rounded-lg
                           transition-all duration-200 relative
                           ${
                             activeWord === index
@@ -393,7 +415,7 @@ export default function ReadingApp() {
                       {/* Dot indicator */}
                       <motion.div
                         className={`
-                          w-2.5 h-2.5 rounded-full mt-3 cursor-pointer transition-all duration-200
+                          w-3 h-3 md:w-4 md:h-4 rounded-full mt-3 md:mt-4 cursor-pointer transition-all duration-200
                           ${
                             activeWord === index
                               ? "bg-emerald-600"
@@ -424,8 +446,8 @@ export default function ReadingApp() {
         </div>
 
         {/* Word count */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-neutral-600">
+        <div className="mt-6 md:mt-8 text-center">
+          <p className="text-base md:text-lg lg:text-xl text-neutral-600">
             {words.length} {words.length === 1 ? "word" : "words"}
           </p>
         </div>

@@ -1,0 +1,12 @@
+{
+  "sentence": "The silly monkey lost his banana",
+  "words": {
+    "the": "/audio/the.wav",
+    "silly": "/audio/silly.wav",
+    "monkey": "/audio/monkey.wav",
+    "lost": "/audio/lost.wav",
+    "his": "/audio/his.wav",
+    "banana": "/audio/banana.wav"
+  },
+  "generated": "2025-08-29T07:06:49.143Z"
+}
