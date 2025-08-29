@@ -151,43 +151,12 @@ export default function ReadingApp() {
     [words, wordAudios]
   );
 
-  const handleWordTap = useCallback(
-    async (index: number, word: string, e?: React.MouseEvent) => {
-      // Prevent onClick if this was triggered by a touch event
-      if (e && e.defaultPrevented) return;
-      if (isCreating) return; // Only prevent during creation
-
-      // Allow tapping even if another word is playing
-      setActiveWord(index);
-
-      // Strip punctuation from the word before finding audio
-      const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
-
-      // Find the audio for this word
-      const wordAudio = wordAudios.find(
-        (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
-      );
-      if (wordAudio) {
-        try {
-          // Play immediately without blocking
-          playAudioBlob(wordAudio.audio).then(() => {
-            // Only clear if this word is still the active one
-            setActiveWord((current) => (current === index ? null : current));
-          });
-        } catch (error) {
-          console.error(`Failed to play word: ${word}`, error);
-        }
-      } else {
-        // Clear immediately if no audio
-        setTimeout(() => setActiveWord(null), 600);
-      }
-    },
-    [isCreating, wordAudios]
-  );
+  // Removed handleWordTap - now handled in handlePointerEnd
 
   const handlePointerStart = useCallback(
     (e: React.MouseEvent | React.TouchEvent, index: number) => {
       e.preventDefault(); // Prevent browser scroll/selection
+      e.stopPropagation(); // Stop event propagation to prevent any click events
       if (isCreating) return; // Only prevent during creation
 
       // Allow starting new swipe even if animation is playing
@@ -430,7 +399,6 @@ export default function ReadingApp() {
                         `}
                         onTouchStart={(e) => handlePointerStart(e, index)}
                         onMouseDown={(e) => handlePointerStart(e, index)}
-                        onClick={(e) => handleWordTap(index, word, e)}
                         animate={{
                           scale: activeWord === index ? 1.1 : 1,
                           y: activeWord === index ? -4 : 0,
@@ -459,7 +427,6 @@ export default function ReadingApp() {
                               : ""
                           }
                         `}
-                        onClick={(e) => handleWordTap(index, word, e)}
                         animate={{
                           scale: activeWord === index ? 1.4 : 1,
                         }}
