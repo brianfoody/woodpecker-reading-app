@@ -1,4 +1,3 @@
-import Groq from "groq-sdk";
 
 // Types for audio data
 interface AudioCacheEntry {
@@ -146,22 +145,6 @@ const getAudioCache = async (): Promise<AudioCache> => {
   return audioCache;
 };
 
-// Initialize Groq client (API key should be set via environment variables in Next.js)
-const getGroqClient = () => {
-  // In Next.js, use process.env for server-side or pass via API route
-  const apiKey =
-    process.env.NEXT_PUBLIC_GROQ_API_KEY || process.env.GROQ_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("GROQ_API_KEY is not configured");
-  }
-
-  return new Groq({
-    apiKey: apiKey,
-    // For browser usage, might need to configure CORS or use via API route
-    dangerouslyAllowBrowser: true,
-  });
-};
 
 /**
  * Get the duration of an audio blob in milliseconds
@@ -209,16 +192,18 @@ const tokenizeSentence = (sentence: string): string[] => {
  * Create audio for a single word or phrase
  */
 const createAudioFile = async (text: string): Promise<Blob> => {
-  const client = getGroqClient();
-
-  const response = await client.audio.speech.create({
-    model: "playai-tts",
-    voice: "Jennifer-PlayAI",
-    input: text,
-    response_format: "wav",
+  const response = await fetch("/api/audio", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
   });
 
-  // Convert response to Blob for browser compatibility
+  if (!response.ok) {
+    throw new Error(`Failed to generate audio: ${response.statusText}`);
+  }
+
   const arrayBuffer = await response.arrayBuffer();
   const blob = new Blob([arrayBuffer], { type: "audio/wav" });
 
