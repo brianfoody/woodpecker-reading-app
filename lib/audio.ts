@@ -10,6 +10,7 @@ interface AudioCacheEntry {
 interface WordAudio {
   word: string;
   audio: Blob;
+  duration: number; // Duration in milliseconds
 }
 
 // IndexedDB cache manager for browser-compatible storage
