@@ -13,6 +13,7 @@ import {
   loadPreGeneratedAudio,
   initializeCacheWithPreGeneratedAudio,
 } from "@/lib/preload-audio";
+import { useVoiceRecording } from "@/lib/useVoiceRecording";
 
 export default function ReadingApp() {
   const [sentence, setSentence] = useState("The silly monkey lost his banana");
@@ -28,13 +29,53 @@ export default function ReadingApp() {
   const [swipeWords, setSwipeWords] = useState<number[]>([]);
   const [isAnimating, setIsAnimating] = useState(false); // Controls overall animation state (tap or sequence)
   const [isSwiping, setIsSwiping] = useState(false); // Controls if a swipe gesture is active (pointer down and moving)
-  const [lastPlayedWord, setLastPlayedWord] = useState<{index: number, time: number} | null>(null);
+  const [lastPlayedWord, setLastPlayedWord] = useState<{
+    index: number;
+    time: number;
+  } | null>(null);
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pointerStart, setPointerStart] = useState<{
     x: number;
     y: number;
   } | null>(null);
+
+  // Voice recording hook
+  const {
+    isRecording,
+    isTranscribing,
+    startRecording,
+    stopRecording,
+    cleanup: cleanupRecording,
+  } = useVoiceRecording({
+    onTranscription: (text) => {
+      setInputSentence(text);
+      handleCreateSentence(text);
+      setVoiceError(null);
+    },
+    onError: (error) => {
+      setVoiceError(error);
+      setTimeout(() => setVoiceError(null), 5000);
+    },
+  });
+
+  // Detect mobile/tablet on mount
+  useEffect(() => {
+    const checkDevice = () => {
+      const width = window.innerWidth;
+      // Consider tablet and mobile (typically < 1024px)
+      setIsMobileOrTablet(width < 1024);
+    };
+
+    checkDevice();
+    window.addEventListener("resize", checkDevice);
+    return () => {
+      window.removeEventListener("resize", checkDevice);
+      cleanupRecording();
+    };
+  }, [cleanupRecording]);
 
   // Load audio for initial sentence on mount
   useEffect(() => {
@@ -67,32 +108,36 @@ export default function ReadingApp() {
   }, []); // Only run once on mount
 
   // Handle sentence creation with actual audio generation
-  const handleCreateSentence = useCallback(async () => {
-    if (!inputSentence.trim() || isCreating) return;
+  const handleCreateSentence = useCallback(
+    async (sentenceOverride?: string) => {
+      const sentenceToUse = sentenceOverride || inputSentence;
+      if (!sentenceToUse.trim() || isCreating) return;
 
-    setIsCreating(true);
-    // Clear any active interactions
-    setActiveWord(null);
-    setSwipeWords([]);
-    setIsAnimating(false);
-    setIsSwiping(false);
+      setIsCreating(true);
+      // Clear any active interactions
+      setActiveWord(null);
+      setSwipeWords([]);
+      setIsAnimating(false);
+      setIsSwiping(false);
 
-    try {
-      // Generate audio for all words in the sentence
-      const audios = await createSentenceAudio(inputSentence);
-      setWordAudios(audios);
+      try {
+        // Generate audio for all words in the sentence
+        const audios = await createSentenceAudio(sentenceToUse);
+        setWordAudios(audios);
 
-      // Update the sentence after generation
-      setSentence(inputSentence);
-    } catch (error) {
-      console.error("Failed to generate audio:", error);
-      // Still update the sentence even if audio generation fails
-      setSentence(inputSentence);
-      setWordAudios([]);
-    } finally {
-      setIsCreating(false);
-    }
-  }, [inputSentence, isCreating]);
+        // Update the sentence after generation
+        setSentence(sentenceToUse);
+      } catch (error) {
+        console.error("Failed to generate audio:", error);
+        // Still update the sentence even if audio generation fails
+        setSentence(sentenceToUse);
+        setWordAudios([]);
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    [inputSentence, isCreating]
+  );
 
   // Unified pointer handlers for mouse and touch
   const getClientCoords = (e: React.MouseEvent | React.TouchEvent) => {
@@ -209,7 +254,7 @@ export default function ReadingApp() {
   const handlePointerEnd = useCallback(async () => {
     if (isSwiping) {
       const now = Date.now();
-      
+
       // Only process if a swipe was active
       if (swipeWords.length > 1) {
         // Multiple words - play sequence
@@ -217,31 +262,37 @@ export default function ReadingApp() {
       } else if (swipeWords.length === 1) {
         // Single tap - play the word
         const index = swipeWords[0];
-        
+
         // Prevent double-tap on the same word within 300ms
-        if (lastPlayedWord && lastPlayedWord.index === index && (now - lastPlayedWord.time) < 300) {
+        if (
+          lastPlayedWord &&
+          lastPlayedWord.index === index &&
+          now - lastPlayedWord.time < 300
+        ) {
           // Reset state but don't play
           setPointerStart(null);
           setIsSwiping(false);
           setTimeout(() => setSwipeWords([]), 500);
           return;
         }
-        
+
         const word = words[index];
         if (word) {
           setActiveWord(index);
-          setLastPlayedWord({index, time: now});
-          
+          setLastPlayedWord({ index, time: now });
+
           // Strip punctuation from the word before finding audio
           const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
-          
+
           const wordAudio = wordAudios.find(
             (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
           );
           if (wordAudio) {
             try {
               playAudioBlob(wordAudio.audio).then(() => {
-                setActiveWord((current) => (current === index ? null : current));
+                setActiveWord((current) =>
+                  current === index ? null : current
+                );
               });
             } catch (error) {
               console.error("Error playing word audio:", error);
@@ -253,7 +304,14 @@ export default function ReadingApp() {
       setIsSwiping(false); // End the swipe gesture
       setTimeout(() => setSwipeWords([]), 500); // Clear swiped words after a short delay
     }
-  }, [swipeWords, isSwiping, animateWordSequence, words, wordAudios, lastPlayedWord]);
+  }, [
+    swipeWords,
+    isSwiping,
+    animateWordSequence,
+    words,
+    wordAudios,
+    lastPlayedWord,
+  ]);
 
   return (
     <div className="min-h-screen bg-neutral-50 p-4 md:p-6 lg:p-8 flex items-center justify-center">
@@ -268,49 +326,51 @@ export default function ReadingApp() {
           </p>
         </div>
 
-        {/* Sentence Input */}
-        <div className="mb-8 md:mb-10">
-          <label
-            htmlFor="sentence-input"
-            className="block text-base md:text-lg font-medium text-neutral-700 mb-3"
-          >
-            Enter sentence
-          </label>
-          <div className="flex flex-col md:flex-row gap-3">
-            <input
-              id="sentence-input"
-              type="text"
-              value={inputSentence}
-              onChange={(e) => setInputSentence(e.target.value)}
-              disabled={isCreating}
-              className="flex-1 px-5 py-4 md:px-6 md:py-4 bg-white border border-neutral-200 rounded-lg text-lg md:text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              placeholder="Type your sentence here"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isCreating) {
-                  handleCreateSentence();
-                }
-              }}
-            />
-            <motion.button
-              onClick={handleCreateSentence}
-              disabled={isCreating || !inputSentence.trim()}
-              className={`
-                px-8 py-4 md:px-10 md:py-4 rounded-lg font-medium text-white text-lg md:text-xl
-                transition-all duration-200 shadow-sm
-                ${
-                  isCreating
-                    ? "bg-neutral-400 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md"
-                }
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-              whileHover={!isCreating ? { scale: 1.03 } : {}}
-              whileTap={!isCreating ? { scale: 0.97 } : {}}
+        {/* Sentence Input - Desktop only */}
+        {!isMobileOrTablet && (
+          <div className="mb-8 md:mb-10">
+            <label
+              htmlFor="sentence-input"
+              className="block text-base md:text-lg font-medium text-neutral-700 mb-3"
             >
-              {isCreating ? "Preparing..." : "Generate Audio"}
-            </motion.button>
+              Enter sentence
+            </label>
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                id="sentence-input"
+                type="text"
+                value={inputSentence}
+                onChange={(e) => setInputSentence(e.target.value)}
+                disabled={isCreating}
+                className="flex-1 px-5 py-4 md:px-6 md:py-4 bg-white border border-neutral-200 rounded-lg text-lg md:text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                placeholder="Type your sentence here"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isCreating) {
+                    handleCreateSentence();
+                  }
+                }}
+              />
+              <motion.button
+                onClick={() => handleCreateSentence()}
+                disabled={isCreating || !inputSentence.trim()}
+                className={`
+                  px-8 py-4 md:px-10 md:py-4 rounded-lg font-medium text-white text-lg md:text-xl
+                  transition-all duration-200 shadow-sm
+                  ${
+                    isCreating
+                      ? "bg-neutral-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md"
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+                whileHover={!isCreating ? { scale: 1.03 } : {}}
+                whileTap={!isCreating ? { scale: 0.97 } : {}}
+              >
+                {isCreating ? "Preparing..." : "Generate Audio"}
+              </motion.button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Reading Area */}
         <div
@@ -462,32 +522,142 @@ export default function ReadingApp() {
           </AnimatePresence>
         </div>
 
+        {/* Microphone Button - Mobile/Tablet only */}
+        {isMobileOrTablet && (
+          <div className="mt-8 flex flex-col items-center">
+            <motion.button
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                stopRecording();
+              }}
+              disabled={isCreating || isTranscribing}
+              className={`
+                relative w-24 h-24 rounded-full flex items-center justify-center
+                transition-all duration-200 shadow-lg
+                ${
+                  isRecording
+                    ? "bg-red-500 scale-110"
+                    : isTranscribing
+                    ? "bg-amber-500"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+              whileHover={!isCreating && !isTranscribing ? { scale: 1.05 } : {}}
+              whileTap={!isCreating && !isTranscribing ? { scale: 0.95 } : {}}
+            >
+              {/* Microphone Icon */}
+              <svg
+                className="w-10 h-10 text-white"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
+                <path d="M16 11a4 4 0 0 1-8 0H6a6 6 0 0 0 12 0h-2Z" />
+                <path d="M12 18a6 6 0 0 0 6-6h-2a4 4 0 0 1-8 0H6a6 6 0 0 0 5 5.917V21h2v-3.083A5.998 5.998 0 0 0 12 18Z" />
+              </svg>
+
+              {/* Recording Indicator */}
+              {isRecording && (
+                <motion.div
+                  className="absolute top-0 right-0 w-4 h-4 bg-white rounded-full"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [1, 0.8, 1],
+                  }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+              )}
+
+              {/* Pulse Animation */}
+              {isRecording && (
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-red-400 opacity-30"
+                  animate={{
+                    scale: [1, 1.3, 1],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+              )}
+            </motion.button>
+
+            {/* Status Text */}
+            <p className="mt-4 text-sm text-neutral-600">
+              {isRecording
+                ? "Recording... Release to stop"
+                : isTranscribing
+                ? "Transcribing..."
+                : "Hold to record"}
+            </p>
+
+            {/* Error Message */}
+            {voiceError && (
+              <motion.p
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-2 text-sm text-red-600"
+              >
+                {voiceError}
+              </motion.p>
+            )}
+
+            {/* Transcribed Text Preview */}
+            {/* {inputSentence && !isRecording && !isTranscribing && (
+              <div className="mt-4 p-3 bg-neutral-100 rounded-lg max-w-full">
+                <p className="text-sm text-neutral-600 mb-1">
+                  Ready to generate:
+                </p>
+                <p className="text-base text-neutral-800 italic">
+                  "{inputSentence}"
+                </p>
+              </div>
+            )} */}
+          </div>
+        )}
+
         {/* Word count */}
-        <div className="mt-6 md:mt-8 text-center">
+        {/* <div className="mt-6 md:mt-8 text-center">
           <p className="text-base md:text-lg lg:text-xl text-neutral-600">
             {words.length} {words.length === 1 ? "word" : "words"}
           </p>
-        </div>
+        </div> */}
 
         {/* Call to Action */}
         <div className="mt-12 md:mt-16 text-center">
           <div className="inline-block">
-            <p className="text-lg md:text-xl text-neutral-700 mb-2">
+            <p className="text-lg md:text-lg text-neutral-700 mb-2">
               Want to create magical learning experiences for your child?
             </p>
             <a
               href="https://woodpeckeros.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-xl md:text-2xl text-emerald-600 hover:text-emerald-700 font-bold transition-all duration-300 hover:scale-105 group"
+              className="inline-flex items-center gap-2 text-xl md:text-xl text-emerald-600 hover:text-emerald-700 font-bold transition-all duration-300 hover:scale-105 group"
             >
-              Join the Woodpecker Revolution
+              Join Woodpecker
               <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
                 →
               </span>
             </a>
             <p className="text-sm md:text-base text-neutral-500 mt-2">
-              Build personalized games that grow with them. 🌱
+              Build personalized learning experiences that grow with them. 🌱
             </p>
           </div>
         </div>
