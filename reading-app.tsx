@@ -180,20 +180,26 @@ export default function ReadingApp() {
         const wordAudio = wordAudios.find(
           (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
         );
-        
+
         if (wordAudio) {
           try {
             // Play audio and wait for it to complete
-            await playAudioBlob(wordAudio.audio);
+
+            playAudioBlob(wordAudio.audio);
+            await new Promise((resolve) =>
+              setTimeout(resolve, wordAudio.duration - 100)
+            );
             // Add a small pause between words
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            // await new Promise((resolve) => setTimeout(resolve, 100));
           } catch (error) {
             console.error(`Failed to play word: ${words[index]}`, error);
             // Fallback delay if audio fails
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
         } else {
-          console.warn(`No audio found for word: ${words[index]} (cleaned: ${cleanWord})`);
+          console.warn(
+            `No audio found for word: ${words[index]} (cleaned: ${cleanWord})`
+          );
           // Default delay if no audio found
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
@@ -214,7 +220,13 @@ export default function ReadingApp() {
       const allIndices = Array.from({ length: words.length }, (_, i) => i);
       animateWordSequence(allIndices);
     }
-  }, [isAnimating, isCreating, words.length, wordAudios.length, animateWordSequence]);
+  }, [
+    isAnimating,
+    isCreating,
+    words.length,
+    wordAudios.length,
+    animateWordSequence,
+  ]);
 
   // Removed handleWordTap - now handled in handlePointerEnd
 
@@ -317,7 +329,9 @@ export default function ReadingApp() {
               console.error("Error playing word audio:", error);
             }
           } else {
-            console.warn(`No audio found for word tap: ${word} (cleaned: ${cleanWord})`);
+            console.warn(
+              `No audio found for word tap: ${word} (cleaned: ${cleanWord})`
+            );
             setTimeout(() => setActiveWord(null), 500);
           }
         }
@@ -487,11 +501,16 @@ export default function ReadingApp() {
                     e.preventDefault();
                     e.stopPropagation();
                     // Only handle click if not a touch device
-                    if (!('ontouchstart' in window)) {
+                    if (!("ontouchstart" in window)) {
                       handlePlayAll();
                     }
                   }}
-                  disabled={isCreating || isInitializing || words.length === 0 || wordAudios.length === 0}
+                  disabled={
+                    isCreating ||
+                    isInitializing ||
+                    words.length === 0 ||
+                    wordAudios.length === 0
+                  }
                   className={`
                     mb-6 px-5 py-2.5 rounded-full flex items-center gap-2.5
                     transition-all duration-200 shadow-md
@@ -534,7 +553,11 @@ export default function ReadingApp() {
                     </svg>
                   )}
                   <span className="text-sm font-medium">
-                    {isAnimating ? "Stop" : wordAudios.length === 0 ? "Loading..." : "Play All"}
+                    {isAnimating
+                      ? "Stop"
+                      : wordAudios.length === 0
+                      ? "Loading..."
+                      : "Play All"}
                   </span>
                 </button>
 
