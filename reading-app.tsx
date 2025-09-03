@@ -232,7 +232,6 @@ export default function ReadingApp() {
 
   const handlePointerStart = useCallback(
     (e: React.MouseEvent | React.TouchEvent, index: number) => {
-      e.preventDefault(); // Prevent browser scroll/selection
       e.stopPropagation(); // Stop event propagation to prevent any click events
       if (isCreating) return; // Only prevent during creation
 
@@ -411,9 +410,9 @@ export default function ReadingApp() {
         {/* Reading Area */}
         <div
           ref={containerRef}
-          className="bg-white rounded-xl border border-neutral-200 p-6 md:p-8 lg:p-10 flex flex-col justify-center items-center overflow-hidden relative shadow-sm"
+          className="bg-white rounded-xl border border-neutral-200 p-6 md:p-8 lg:p-10 flex flex-col justify-center items-center overflow-x-hidden overflow-y-auto relative shadow-sm"
           style={{
-            touchAction: "none", // Prevent browser scroll/zoom gestures
+            touchAction: "pan-y", // Enable vertical scrolling
             minHeight: "400px",
             backgroundImage: `radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
                              radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.02) 0%, transparent 50%)`,
