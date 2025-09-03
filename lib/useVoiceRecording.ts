@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { playStartSound, playStopSound, playErrorSound } from "./audioFeedback";
 
 interface UseVoiceRecordingOptions {
   onTranscription?: (text: string) => void;
@@ -52,9 +53,11 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
       // Start recording
       mediaRecorder.start();
       setIsRecording(true);
+      playStartSound(); // Play feedback sound
     } catch (error) {
       console.error("Failed to start recording:", error);
       setPermissionStatus("denied");
+      playErrorSound(); // Play error sound
       options.onError?.(
         "Microphone access denied. Please enable microphone permissions."
       );
@@ -62,7 +65,8 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
   }, [options]);
 
   const stopRecording = useCallback(async () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    if (!mediaRecorderRef.current) return;
+    if (mediaRecorderRef.current.state !== "recording") return;
 
     return new Promise<void>((resolve) => {
       const mediaRecorder = mediaRecorderRef.current!;
@@ -70,6 +74,7 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
       mediaRecorder.onstop = async () => {
         setIsRecording(false);
         setIsTranscribing(true);
+        playStopSound(); // Play feedback sound
 
         // Stop all tracks to release the microphone
         if (streamRef.current) {
@@ -101,10 +106,12 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
           if (data.text) {
             options.onTranscription?.(data.text.trim());
           } else {
+            playErrorSound();
             options.onError?.("No transcription received");
           }
         } catch (error) {
           console.error("Transcription error:", error);
+          playErrorSound();
           options.onError?.("Failed to transcribe audio. Please try again.");
         } finally {
           setIsTranscribing(false);
@@ -116,7 +123,7 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
       mediaRecorder.stop();
       mediaRecorderRef.current = null;
     });
-  }, [isRecording, options]);
+  }, [options]);
 
   // Cleanup on unmount
   const cleanup = useCallback(() => {

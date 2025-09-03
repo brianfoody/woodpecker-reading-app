@@ -27,8 +27,8 @@ export default function ReadingApp() {
 
   const [activeWord, setActiveWord] = useState<number | null>(null);
   const [swipeWords, setSwipeWords] = useState<number[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false); // Controls overall animation state (tap or sequence)
   const [isSwiping, setIsSwiping] = useState(false); // Controls if a swipe gesture is active (pointer down and moving)
+  const [isAnimating, setIsAnimating] = useState(false); // Controls animation state for word sequences
   const [lastPlayedWord, setLastPlayedWord] = useState<{
     index: number;
     time: number;
@@ -117,7 +117,6 @@ export default function ReadingApp() {
       // Clear any active interactions
       setActiveWord(null);
       setSwipeWords([]);
-      setIsAnimating(false);
       setIsSwiping(false);
 
       try {
@@ -155,7 +154,7 @@ export default function ReadingApp() {
       for (const index of sortedIndices) {
         // Check if animation was cancelled
         const shouldContinue = await new Promise<boolean>((resolve) => {
-          setIsAnimating((current) => {
+          setIsAnimating((current: boolean) => {
             if (!current) {
               resolve(false); // Animation was cancelled
               return current;
@@ -526,21 +525,19 @@ export default function ReadingApp() {
         {isMobileOrTablet && (
           <div className="mt-8 flex flex-col items-center">
             <motion.button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={stopRecording}
-              onTouchStart={(e) => {
+              onClick={(e) => {
                 e.preventDefault();
-                startRecording();
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                stopRecording();
+                if (isRecording) {
+                  stopRecording();
+                } else if (!isTranscribing) {
+                  startRecording();
+                }
               }}
               disabled={isCreating || isTranscribing}
               className={`
                 relative w-24 h-24 rounded-full flex items-center justify-center
                 transition-all duration-200 shadow-lg
+                select-none touch-none
                 ${
                   isRecording
                     ? "bg-red-500 scale-110"
@@ -550,15 +547,25 @@ export default function ReadingApp() {
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
+              style={{
+                WebkitTouchCallout: "none",
+                WebkitUserSelect: "none",
+                userSelect: "none",
+              }}
               whileHover={!isCreating && !isTranscribing ? { scale: 1.05 } : {}}
               whileTap={!isCreating && !isTranscribing ? { scale: 0.95 } : {}}
             >
               {/* Microphone Icon */}
               <svg
-                className="w-10 h-10 text-white"
+                className="w-10 h-10 text-white select-none pointer-events-none"
                 fill="currentColor"
                 viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  WebkitTouchCallout: "none",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
               >
                 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
                 <path d="M16 11a4 4 0 0 1-8 0H6a6 6 0 0 0 12 0h-2Z" />
@@ -598,12 +605,12 @@ export default function ReadingApp() {
             </motion.button>
 
             {/* Status Text */}
-            <p className="mt-4 text-sm text-neutral-600">
+            <p className="mt-4 text-sm text-neutral-600 select-none">
               {isRecording
-                ? "Recording... Release to stop"
+                ? "Recording... Tap to stop"
                 : isTranscribing
                 ? "Transcribing..."
-                : "Hold to record"}
+                : "Tap to record"}
             </p>
 
             {/* Error Message */}
