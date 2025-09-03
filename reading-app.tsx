@@ -61,7 +61,7 @@ export default function ReadingApp() {
     },
   });
 
-  // Detect mobile/tablet on mount
+  // Detect mobile/tablet on mount and prevent gestures
   useEffect(() => {
     const checkDevice = () => {
       const width = window.innerWidth;
@@ -69,10 +69,18 @@ export default function ReadingApp() {
       setIsMobileOrTablet(width < 1024);
     };
 
+    // Prevent gesture-based context menus on iOS
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+
     checkDevice();
     window.addEventListener("resize", checkDevice);
+    document.addEventListener("gesturestart", preventGesture);
+    
     return () => {
       window.removeEventListener("resize", checkDevice);
+      document.removeEventListener("gesturestart", preventGesture);
       cleanupRecording();
     };
   }, [cleanupRecording]);
@@ -524,20 +532,47 @@ export default function ReadingApp() {
         {/* Microphone Button - Mobile/Tablet only */}
         {isMobileOrTablet && (
           <div className="mt-8 flex flex-col items-center">
-            <motion.button
-              onClick={(e) => {
+            <button
+              id="ptt-button"
+              aria-label="Hold to talk"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                if (!isRecording && !isTranscribing && !isCreating) {
+                  startRecording();
+                }
+              }}
+              onPointerUp={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isRecording) {
+                  stopRecording();
+                }
+              }}
+              onPointerCancel={(e) => {
                 e.preventDefault();
                 if (isRecording) {
                   stopRecording();
-                } else if (!isTranscribing) {
-                  startRecording();
+                }
+              }}
+              onLostPointerCapture={(e) => {
+                e.preventDefault();
+                if (isRecording) {
+                  stopRecording();
+                }
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseLeave={(e) => {
+                e.preventDefault();
+                if (isRecording) {
+                  stopRecording();
                 }
               }}
               disabled={isCreating || isTranscribing}
               className={`
                 relative w-24 h-24 rounded-full flex items-center justify-center
                 transition-all duration-200 shadow-lg
-                select-none touch-none
                 ${
                   isRecording
                     ? "bg-red-500 scale-110"
@@ -548,12 +583,14 @@ export default function ReadingApp() {
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
               style={{
-                WebkitTouchCallout: "none",
                 WebkitUserSelect: "none",
                 userSelect: "none",
+                WebkitTouchCallout: "none",
+                touchAction: "manipulation",
+                WebkitTapHighlightColor: "transparent",
+                caretColor: "transparent",
+                cursor: "pointer",
               }}
-              whileHover={!isCreating && !isTranscribing ? { scale: 1.05 } : {}}
-              whileTap={!isCreating && !isTranscribing ? { scale: 0.95 } : {}}
             >
               {/* Microphone Icon */}
               <svg
@@ -574,43 +611,22 @@ export default function ReadingApp() {
 
               {/* Recording Indicator */}
               {isRecording && (
-                <motion.div
-                  className="absolute top-0 right-0 w-4 h-4 bg-white rounded-full"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [1, 0.8, 1],
-                  }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                />
+                <div className="absolute top-0 right-0 w-4 h-4 bg-white rounded-full animate-pulse" />
               )}
 
               {/* Pulse Animation */}
               {isRecording && (
-                <motion.div
-                  className="absolute inset-0 rounded-full bg-red-400 opacity-30"
-                  animate={{
-                    scale: [1, 1.3, 1],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                />
+                <div className="absolute inset-0 rounded-full bg-red-400 opacity-30 animate-ping" />
               )}
-            </motion.button>
+            </button>
 
             {/* Status Text */}
-            <p className="mt-4 text-sm text-neutral-600 select-none">
+            <p className="mt-4 text-sm text-neutral-600 select-none" style={{ userSelect: "none" }}>
               {isRecording
-                ? "Recording... Tap to stop"
+                ? "Recording... Release to stop"
                 : isTranscribing
                 ? "Transcribing..."
-                : "Tap to record"}
+                : "Hold to talk"}
             </p>
 
             {/* Error Message */}
