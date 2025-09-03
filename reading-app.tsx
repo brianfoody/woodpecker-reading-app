@@ -77,7 +77,7 @@ export default function ReadingApp() {
     checkDevice();
     window.addEventListener("resize", checkDevice);
     document.addEventListener("gesturestart", preventGesture);
-    
+
     return () => {
       window.removeEventListener("resize", checkDevice);
       document.removeEventListener("gesturestart", preventGesture);
@@ -176,26 +176,26 @@ export default function ReadingApp() {
 
         setActiveWord(index);
         // Strip punctuation and find the audio for this word
-        const cleanWord = words[index].replace(/[.,!?;:'"'()\[\]{}]/g, "");
+        const cleanWord = words[index].replace(/[.,!?;:'"()\[\]{}]/g, "");
         const wordAudio = wordAudios.find(
           (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
         );
+        
         if (wordAudio) {
           try {
-            // Don't await, let audio play in background
-            playAudioBlob(wordAudio.audio);
-            // Wait for the audio duration plus a small pause
-            await new Promise((resolve) =>
-              setTimeout(resolve, wordAudio.duration - 100)
-            );
+            // Play audio and wait for it to complete
+            await playAudioBlob(wordAudio.audio);
+            // Add a small pause between words
+            await new Promise((resolve) => setTimeout(resolve, 100));
           } catch (error) {
             console.error(`Failed to play word: ${words[index]}`, error);
             // Fallback delay if audio fails
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         } else {
+          console.warn(`No audio found for word: ${words[index]} (cleaned: ${cleanWord})`);
           // Default delay if no audio found
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
         setActiveWord(null);
       }
@@ -203,6 +203,18 @@ export default function ReadingApp() {
     },
     [words, wordAudios]
   );
+
+  const handlePlayAll = useCallback(() => {
+    if (isAnimating) {
+      // Stop the animation
+      setIsAnimating(false);
+      setActiveWord(null);
+    } else if (!isCreating && words.length > 0 && wordAudios.length > 0) {
+      // Start playing all words
+      const allIndices = Array.from({ length: words.length }, (_, i) => i);
+      animateWordSequence(allIndices);
+    }
+  }, [isAnimating, isCreating, words.length, wordAudios.length, animateWordSequence]);
 
   // Removed handleWordTap - now handled in handlePointerEnd
 
@@ -289,7 +301,7 @@ export default function ReadingApp() {
           setLastPlayedWord({ index, time: now });
 
           // Strip punctuation from the word before finding audio
-          const cleanWord = word.replace(/[.,!?;:'"'()\[\]{}]/g, "");
+          const cleanWord = word.replace(/[.,!?;:'"()\[\]{}]/g, "");
 
           const wordAudio = wordAudios.find(
             (wa) => wa.word.toLowerCase() === cleanWord.toLowerCase()
@@ -304,6 +316,9 @@ export default function ReadingApp() {
             } catch (error) {
               console.error("Error playing word audio:", error);
             }
+          } else {
+            console.warn(`No audio found for word tap: ${word} (cleaned: ${cleanWord})`);
+            setTimeout(() => setActiveWord(null), 500);
           }
         }
       }
@@ -451,7 +466,7 @@ export default function ReadingApp() {
 
           {/* Content with fade transition */}
           <AnimatePresence mode="wait">
-            {!isCreating && (
+            {!isCreating && !isInitializing && (
               <motion.div
                 key={sentence} // Key ensures re-render on sentence change
                 className="flex flex-col items-center w-full"
@@ -460,6 +475,69 @@ export default function ReadingApp() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
+                {/* Play All Button */}
+                <button
+                  type="button"
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayAll();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Only handle click if not a touch device
+                    if (!('ontouchstart' in window)) {
+                      handlePlayAll();
+                    }
+                  }}
+                  disabled={isCreating || isInitializing || words.length === 0 || wordAudios.length === 0}
+                  className={`
+                    mb-6 px-5 py-2.5 rounded-full flex items-center gap-2.5
+                    transition-all duration-200 shadow-md
+                    select-none touch-none
+                    ${
+                      isAnimating
+                        ? "bg-amber-500 hover:bg-amber-600 text-white"
+                        : wordAudios.length === 0
+                        ? "bg-gray-400 text-gray-200"
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-lg"
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
+                  style={{
+                    WebkitUserSelect: "none",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
+                    touchAction: "manipulation",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  {/* Play/Stop Icon */}
+                  {isAnimating ? (
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <rect x="6" y="6" width="12" height="12" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                  <span className="text-sm font-medium">
+                    {isAnimating ? "Stop" : wordAudios.length === 0 ? "Loading..." : "Play All"}
+                  </span>
+                </button>
+
                 {/* Sentence */}
                 <div className="flex flex-wrap justify-center gap-x-4 md:gap-x-6 gap-y-6 md:gap-y-8 mb-12 px-4">
                   {words.map((word, index) => (
@@ -621,7 +699,10 @@ export default function ReadingApp() {
             </button>
 
             {/* Status Text */}
-            <p className="mt-4 text-sm text-neutral-600 select-none" style={{ userSelect: "none" }}>
+            <p
+              className="mt-4 text-sm text-neutral-600 select-none"
+              style={{ userSelect: "none" }}
+            >
               {isRecording
                 ? "Recording... Release to stop"
                 : isTranscribing
