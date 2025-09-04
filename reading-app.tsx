@@ -769,21 +769,21 @@ export default function ReadingApp() {
         <div className="mt-12 md:mt-16 text-center">
           <div className="inline-block">
             <p className="text-lg md:text-lg text-neutral-700 mb-2">
-              Want to create magical learning experiences for your child?
+              Sponsored by the good folk at
             </p>
             <a
-              href="https://woodpeckeros.com"
+              href="https://www.verticalai.com.au/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xl md:text-xl text-emerald-600 hover:text-emerald-700 font-bold transition-all duration-300 hover:scale-105 group"
             >
-              Join Woodpecker
+              VerticalAI
               <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
                 →
               </span>
             </a>
             <p className="text-sm md:text-base text-neutral-500 mt-2">
-              Build personalized learning experiences that grow with them. 🌱
+              Voice automation that stays under your control. 🌱
             </p>
           </div>
         </div>
