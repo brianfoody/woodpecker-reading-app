@@ -71,12 +71,15 @@ export default function AudioPage() {
 
     const handleTimeUpdate = () => {
       const currentTime = audio.currentTime;
+      
+      // Add a small look-ahead offset (100ms) to highlight words slightly before they're spoken
+      // This makes the highlighting feel more responsive and natural
+      const lookAheadTime = currentTime + 0.1;
 
       // Find the word that should be highlighted based on current playback time
-      // The timestamps are from the original audio, so we compare directly
       let wordIndex = -1;
       for (let i = 0; i < words.length; i++) {
-        if (words[i].startTime <= currentTime) {
+        if (words[i].startTime <= lookAheadTime) {
           wordIndex = i;
         } else {
           break; // Stop once we hit a word that hasn't started yet
