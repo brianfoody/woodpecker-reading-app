@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
     const response = await elevenlabs.textToSpeech.convertWithTimestamps(
       voiceId,
       {
-        text: text,
-        modelId: "eleven_multilingual_v2",
+        text: `[spaced] ${text}`,
+        modelId: "eleven_v3",
+        voiceSettings: {
+          speed: 0.5,
+        },
       }
     );
 
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       audioBase64: response.audioBase64,
-      words,
+      words: words.filter((word) => !/^\[.*\]$/.test(word.text)),
       fullText: characters.join(""),
     });
   } catch (error) {
