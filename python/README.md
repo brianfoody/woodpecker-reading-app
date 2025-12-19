@@ -6,7 +6,7 @@ This directory contains Python scripts for audio processing tasks.
 
 ### Prerequisites
 
-1. Python 3.7 or higher
+1. Python 3.7 - 3.12 (Note: Python 3.13+ has compatibility issues with pydub's audioop dependency)
 2. FFmpeg installed on your system
 
 #### Installing FFmpeg

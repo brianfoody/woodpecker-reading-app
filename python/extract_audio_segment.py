@@ -15,7 +15,7 @@ Arguments:
                  defaults to input_file_segment_start-end.ext
 
 Examples:
-    python extract_audio_segment.py audio.mp3 10.5 25.3
+    python extract_audio_segment.py "/Users/brianfoody/Downloads/littlerabbit.mp3" 1.217 1.277
     python extract_audio_segment.py audio.mp3 10.5 25.3 output.mp3
     python extract_audio_segment.py story.wav 0 5.5 word1.wav
 """
@@ -24,7 +24,6 @@ import sys
 import os
 from pathlib import Path
 from pydub import AudioSegment
-from pydub.utils import mediainfo
 import argparse
 
 
