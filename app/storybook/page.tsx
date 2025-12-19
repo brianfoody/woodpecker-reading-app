@@ -45,7 +45,7 @@ interface Paragraph {
   text?: string;
 }
 
-type PlaybackSpeed = "0.75" | "0.9" | "1.15";
+type PlaybackSpeed = "0.6" | "0.85" | "1.1";
 
 interface StoryHistoryItem {
   text: string;
@@ -71,11 +71,13 @@ export default function StoryBookPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [hoveredWordIndex, setHoveredWordIndex] = useState(-1);
-  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>("0.9");
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>("0.85");
   const audioRef = useRef<HTMLAudioElement>(null);
   const isUserInteracting = useRef(false);
   const wordPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const continuousPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentPlayingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const currentHighlightIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load story history from local storage on mount
   useEffect(() => {
@@ -364,6 +366,18 @@ export default function StoryBookPage() {
   const togglePlayPause = () => {
     if (!audioRef.current) return;
 
+    // Stop any currently playing paragraph/word audio
+    if (currentPlayingAudioRef.current) {
+      currentPlayingAudioRef.current.pause();
+      currentPlayingAudioRef.current = null;
+    }
+
+    // Clear any highlight interval
+    if (currentHighlightIntervalRef.current) {
+      clearInterval(currentHighlightIntervalRef.current);
+      currentHighlightIntervalRef.current = null;
+    }
+
     isUserInteracting.current = false;
 
     if (isPlaying) {
@@ -397,6 +411,18 @@ export default function StoryBookPage() {
 
     const paragraph = paragraphs[paragraphIndex];
 
+    // Stop any currently playing audio
+    if (currentPlayingAudioRef.current) {
+      currentPlayingAudioRef.current.pause();
+      currentPlayingAudioRef.current = null;
+    }
+
+    // Clear any existing highlight interval
+    if (currentHighlightIntervalRef.current) {
+      clearInterval(currentHighlightIntervalRef.current);
+      currentHighlightIntervalRef.current = null;
+    }
+
     // Use dedicated paragraph audio if available
     if (paragraph.audioBase64) {
       // Clear any existing interval
@@ -420,6 +446,9 @@ export default function StoryBookPage() {
         );
         paragraphAudio.playbackRate = parseFloat(playbackSpeed);
 
+        // Store reference to current playing audio
+        currentPlayingAudioRef.current = paragraphAudio;
+
         // Find the starting index of this paragraph's words in the global words array
         let startWordIndex = 0;
         for (let i = 0; i < paragraphIndex; i++) {
@@ -435,6 +464,7 @@ export default function StoryBookPage() {
         const highlightInterval = setInterval(() => {
           if (!isUserInteracting.current) {
             clearInterval(highlightInterval);
+            currentHighlightIntervalRef.current = null;
             return;
           }
 
@@ -457,10 +487,15 @@ export default function StoryBookPage() {
           }
         }, 50);
 
+        // Store the highlight interval reference
+        currentHighlightIntervalRef.current = highlightInterval;
+
         // Wait for the paragraph to finish
         await new Promise<void>((resolve) => {
           paragraphAudio.onended = () => {
             clearInterval(highlightInterval);
+            currentHighlightIntervalRef.current = null;
+            currentPlayingAudioRef.current = null;
             isUserInteracting.current = false;
             setTimeout(() => {
               if (!isPlaying) {
@@ -472,6 +507,8 @@ export default function StoryBookPage() {
 
           paragraphAudio.onerror = () => {
             clearInterval(highlightInterval);
+            currentHighlightIntervalRef.current = null;
+            currentPlayingAudioRef.current = null;
             console.error("Failed to play paragraph audio");
             isUserInteracting.current = false;
             setCurrentWordIndex(-1);
@@ -627,6 +664,12 @@ export default function StoryBookPage() {
   };
 
   const playWordWithAudio = async (audioBase64: string, wordIndex: number) => {
+    // Stop any currently playing audio
+    if (currentPlayingAudioRef.current) {
+      currentPlayingAudioRef.current.pause();
+      currentPlayingAudioRef.current = null;
+    }
+
     // Clear any existing interval
     if (wordPlayIntervalRef.current) {
       clearInterval(wordPlayIntervalRef.current);
@@ -649,16 +692,21 @@ export default function StoryBookPage() {
       const wordAudio = new Audio(audioBase64);
       wordAudio.playbackRate = parseFloat(playbackSpeed);
 
+      // Store reference to current playing audio
+      currentPlayingAudioRef.current = wordAudio;
+
       // Play the word audio
       await wordAudio.play();
 
       // Wait for the word to finish playing
       await new Promise<void>((resolve) => {
         wordAudio.onended = () => {
+          currentPlayingAudioRef.current = null;
           resolve();
         };
         wordAudio.onerror = () => {
           console.error(`Failed to play word audio`);
+          currentPlayingAudioRef.current = null;
           resolve();
         };
       });
@@ -716,7 +764,6 @@ export default function StoryBookPage() {
         <Card className="shadow-xl border-amber-200">
           <CardHeader className="bg-gradient-to-r from-amber-100 to-orange-100">
             <CardTitle className="text-3xl font-normal text-amber-900 flex items-center gap-3">
-              <BookOpen className="h-8 w-8" />
               Interactive Storybook Reader
             </CardTitle>
           </CardHeader>
