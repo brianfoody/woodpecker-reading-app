@@ -821,7 +821,7 @@ export default function StoryBookPage() {
                               JSON.stringify(updatedHistory)
                             );
                           }}
-                          className="opacity-0 group-hover:opacity-100 ml-2 text-amber-600 hover:text-amber-800"
+                          className="opacity-0 group-hover:opacity-100 ml-2 text-neutral-400 hover:text-neutral-600"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -881,15 +881,17 @@ export default function StoryBookPage() {
                   <Button
                     onClick={togglePlayPause}
                     variant="outline"
-                    className="border-amber-300 hover:bg-amber-50"
+                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
                   >
                     {isPlaying ? (
                       <>
-                        <Pause className="mr-2 h-4 w-4" /> Pause
+                        <Pause className="mr-2 h-3.5 w-3.5" />
+                        Pause
                       </>
                     ) : (
                       <>
-                        <Play className="mr-2 h-4 w-4" /> Play
+                        <Play className="mr-2 h-3.5 w-3.5" />
+                        Play
                       </>
                     )}
                   </Button>
@@ -897,9 +899,9 @@ export default function StoryBookPage() {
                   <Button
                     onClick={resetAudio}
                     variant="outline"
-                    className="border-amber-300 hover:bg-amber-50"
+                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
                   >
-                    <RotateCcw className="mr-2 h-4 w-4" />
+                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
                     Reset
                   </Button>
 
@@ -907,7 +909,7 @@ export default function StoryBookPage() {
                     value={playbackSpeed}
                     onValueChange={handleSpeedChange}
                   >
-                    <SelectTrigger className="w-36 border-amber-300">
+                    <SelectTrigger className="w-28 border-neutral-200 h-9 text-sm rounded-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -920,17 +922,17 @@ export default function StoryBookPage() {
                   <Button
                     onClick={downloadAudio}
                     variant="outline"
-                    className="border-amber-300 hover:bg-amber-50"
+                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-3.5 w-3.5" />
                     Download
                   </Button>
                 </>
               )}
 
               {isLoadingWords && (
-                <div className="text-sm text-amber-600 flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="text-xs text-neutral-500 flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
                   Loading word audio...
                 </div>
               )}
@@ -939,14 +941,9 @@ export default function StoryBookPage() {
         </Card>
 
         {paragraphs.length > 0 && (
-          <Card className="shadow-xl border-amber-200">
-            <CardHeader className="bg-gradient-to-r from-orange-100 to-amber-100">
-              <CardTitle className="text-2xl font-normal text-amber-900">
-                Click any word to hear it!
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="bg-white rounded-xl p-8 shadow-inner border border-amber-100">
+          <Card className="bg-white rounded-xl border border-neutral-200 shadow-sm">
+            <CardContent className="p-6 md:p-8">
+              <div>
                 <div className="space-y-6">
                   {paragraphs.map((paragraph, pIndex) => {
                     // Calculate the starting global index for this paragraph
@@ -956,18 +953,18 @@ export default function StoryBookPage() {
                     }
 
                     return (
-                      <div key={pIndex} className="flex gap-4 group">
+                      <div key={pIndex} className="flex gap-3 group">
                         {/* Paragraph play button */}
                         <button
                           onClick={() => playParagraph(pIndex)}
-                          className="flex-shrink-0 mt-1 p-2 rounded-full bg-amber-100 hover:bg-amber-200 transition-colors opacity-60 hover:opacity-100 group-hover:opacity-100"
+                          className="flex-shrink-0 mt-1 p-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all opacity-0 group-hover:opacity-100"
                           aria-label={`Play paragraph ${pIndex + 1}`}
                         >
-                          <Play className="w-4 h-4 text-amber-700" />
+                          <Play className="w-3 h-3 text-neutral-600" />
                         </button>
 
                         {/* Paragraph text */}
-                        <div className="flex-1 text-2xl leading-relaxed text-neutral-800">
+                        <div className="flex-1 text-xl md:text-2xl leading-relaxed text-neutral-700">
                           {paragraph.words.map((word, wIndex) => {
                             const globalIndex = globalStartIndex + wIndex;
                             const globalWord = words[globalIndex];
@@ -992,7 +989,7 @@ export default function StoryBookPage() {
                                     : undefined
                                 }
                                 className={`
-                                  inline-block px-1 py-0.5 mx-0.5 rounded-md
+                                  inline-block px-2 md:px-3 py-1 md:py-1.5 mx-1 rounded-lg
                                   transition-all duration-200 select-none relative
                                   ${
                                     generateWords
@@ -1001,15 +998,15 @@ export default function StoryBookPage() {
                                   }
                                   ${
                                     globalIndex === currentWordIndex
-                                      ? "bg-yellow-300 shadow-md scale-105 font-medium"
+                                      ? "bg-emerald-600 text-white shadow-lg scale-105"
                                       : globalIndex === hoveredWordIndex &&
                                         generateWords
-                                      ? "bg-amber-100 shadow-sm scale-102"
+                                      ? "bg-neutral-100"
                                       : generateWords
-                                      ? "hover:bg-amber-50"
+                                      ? "hover:bg-neutral-50"
                                       : ""
                                   }
-                                  ${isWordLoading ? "opacity-60" : ""}
+                                  ${isWordLoading ? "opacity-50" : ""}
                                 `}
                                 style={{
                                   fontFamily:
@@ -1019,7 +1016,7 @@ export default function StoryBookPage() {
                                 {word.text}
                                 {isWordLoading && (
                                   <span className="absolute inset-0 flex items-center justify-center">
-                                    <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                                    <Loader2 className="h-3 w-3 animate-spin text-neutral-500" />
                                   </span>
                                 )}
                               </span>
@@ -1031,11 +1028,11 @@ export default function StoryBookPage() {
                   })}
                 </div>
               </div>
-              <div className="mt-4 text-center text-sm text-amber-600">
-                {generateWords
-                  ? "Tip: Click on any word to hear how it sounds!"
-                  : "Tip: Enable 'Generate individual word audio' to click on words"}
-              </div>
+              {generateWords && (
+                <div className="mt-6 text-center text-xs text-neutral-400">
+                  Click any word to hear it
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
