@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Play,
   Pause,
@@ -16,14 +13,6 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface Word {
   text: string;
@@ -45,7 +34,7 @@ interface Paragraph {
   text?: string;
 }
 
-type PlaybackSpeed = "0.6" | "0.85" | "1.1";
+type PlaybackSpeed = "0.60" | "0.85" | "1.1";
 
 interface StoryHistoryItem {
   text: string;
@@ -399,8 +388,8 @@ export default function StoryBookPage() {
     }
   };
 
-  const handleSpeedChange = (speed: PlaybackSpeed) => {
-    setPlaybackSpeed(speed);
+  const handleSpeedChange = (speed: string) => {
+    setPlaybackSpeed(speed as PlaybackSpeed);
     if (audioRef.current) {
       audioRef.current.playbackRate = parseFloat(speed);
     }
@@ -759,236 +748,221 @@ export default function StoryBookPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <Card className="shadow-xl border-amber-200">
-          <CardHeader className="bg-gradient-to-r from-amber-100 to-orange-100">
-            <CardTitle className="text-3xl font-normal text-amber-900 flex items-center gap-3">
-              Interactive Storybook Reader
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 p-8">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label
-                  htmlFor="text-input"
-                  className="text-sm text-amber-700 font-medium"
+    <div className="min-h-screen bg-neutral-50 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Input Section */}
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label
+                htmlFor="text-input"
+                className="text-lg text-neutral-700 font-medium"
+              >
+                Enter your story text
+              </label>
+              {storyHistory.length > 0 && (
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="text-neutral-600 hover:text-neutral-800 flex items-center text-sm font-medium transition-colors"
                 >
-                  Enter your story text
-                </label>
-                {storyHistory.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowHistory(!showHistory)}
-                    className="text-amber-700 hover:text-amber-800"
-                  >
-                    <Clock className="mr-1 h-4 w-4" />
-                    History ({storyHistory.length})
-                    <ChevronDown
-                      className={`ml-1 h-4 w-4 transition-transform ${
-                        showHistory ? "rotate-180" : ""
-                      }`}
-                    />
-                  </Button>
-                )}
-              </div>
-
-              {showHistory && storyHistory.length > 0 && (
-                <div className="mb-4 border border-amber-200 rounded-lg p-2 bg-amber-50 max-h-48 overflow-y-auto">
-                  <div className="space-y-1">
-                    {storyHistory.map((item, index) => (
-                      <div
-                        key={item.timestamp}
-                        className="p-2 hover:bg-amber-100 rounded cursor-pointer text-sm group flex justify-between items-start"
-                        onClick={() => {
-                          setText(item.text);
-                          setShowHistory(false);
-                        }}
-                      >
-                        <span className="flex-1 line-clamp-2">
-                          {item.text.substring(0, 100)}...
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updatedHistory = storyHistory.filter(
-                              (_, i) => i !== index
-                            );
-                            setStoryHistory(updatedHistory);
-                            localStorage.setItem(
-                              STORY_HISTORY_KEY,
-                              JSON.stringify(updatedHistory)
-                            );
-                          }}
-                          className="opacity-0 group-hover:opacity-100 ml-2 text-neutral-400 hover:text-neutral-600"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <Clock className="mr-1 h-4 w-4" />
+                  History ({storyHistory.length})
+                  <ChevronDown
+                    className={`ml-1 h-4 w-4 transition-transform ${
+                      showHistory ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
               )}
-
-              <Textarea
-                id="text-input"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type or paste your story here..."
-                className="min-h-[140px] resize-none border-amber-200 focus:border-amber-400 text-base"
-              />
-
-              <div className="flex items-center space-x-2 mt-2">
-                <Checkbox
-                  id="generate-words"
-                  checked={generateWords}
-                  onCheckedChange={(checked) =>
-                    setGenerateWords(checked as boolean)
-                  }
-                  className="border-amber-300 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
-                />
-                <label
-                  htmlFor="generate-words"
-                  className="text-sm text-amber-700 cursor-pointer"
-                >
-                  Generate individual word audio (enables click-to-hear words)
-                </label>
-              </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={generateAudio}
-                disabled={isLoading || !text.trim()}
-                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg"
+            {showHistory && storyHistory.length > 0 && (
+              <div className="mb-4 border border-neutral-200 rounded-lg p-2 bg-neutral-50 max-h-48 overflow-y-auto">
+                <div className="space-y-1">
+                  {storyHistory.map((item, index) => (
+                    <div
+                      key={item.timestamp}
+                      className="p-2 hover:bg-neutral-100 rounded cursor-pointer text-sm group flex justify-between items-start"
+                      onClick={() => {
+                        setText(item.text);
+                        setShowHistory(false);
+                      }}
+                    >
+                      <span className="flex-1 line-clamp-2">
+                        {item.text.substring(0, 100)}...
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const updatedHistory = storyHistory.filter(
+                            (_, i) => i !== index
+                          );
+                          setStoryHistory(updatedHistory);
+                          localStorage.setItem(
+                            STORY_HISTORY_KEY,
+                            JSON.stringify(updatedHistory)
+                          );
+                        }}
+                        className="opacity-0 group-hover:opacity-100 ml-2 text-neutral-400 hover:text-neutral-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <textarea
+              id="text-input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              autoFocus
+              placeholder="Type or paste your story here..."
+              className="w-full min-h-[140px] resize-none border-4 border-neutral-400  ring-black rounded-lg px-4 py-3 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-base"
+            />
+
+            <div className="flex items-center space-x-2 mt-2">
+              <input
+                type="checkbox"
+                id="generate-words"
+                checked={generateWords}
+                onChange={(e) => setGenerateWords(e.target.checked)}
+                className="w-4 h-4 text-emerald-600 border-neutral-300 rounded focus:ring-emerald-500"
+              />
+              <label
+                htmlFor="generate-words"
+                className="text-sm text-neutral-700 cursor-pointer"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Story...
-                  </>
-                ) : (
-                  <>
-                    <Volume2 className="mr-2 h-4 w-4" />
-                    Generate Audio Story
-                  </>
-                )}
-              </Button>
+                Generate individual word audio (enables click-to-hear words)
+              </label>
+            </div>
+          </div>
 
-              {audioSrc && (
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={generateAudio}
+              disabled={isLoading || !text.trim()}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2 mt-4"
+            >
+              {isLoading ? (
                 <>
-                  <Button
-                    onClick={togglePlayPause}
-                    variant="outline"
-                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
-                  >
-                    {isPlaying ? (
-                      <>
-                        <Pause className="mr-2 h-3.5 w-3.5" />
-                        Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-3.5 w-3.5" />
-                        Play
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={resetAudio}
-                    variant="outline"
-                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
-                  >
-                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                    Reset
-                  </Button>
-
-                  <Select
-                    value={playbackSpeed}
-                    onValueChange={handleSpeedChange}
-                  >
-                    <SelectTrigger className="w-28 border-neutral-200 h-9 text-sm rounded-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0.60">Slow (0.75x)</SelectItem>
-                      <SelectItem value="0.85">Normal (1.0x)</SelectItem>
-                      <SelectItem value="1.1">Fast (1.25x)</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    onClick={downloadAudio}
-                    variant="outline"
-                    className="border-neutral-200 hover:bg-neutral-50 h-9 text-sm rounded-full"
-                  >
-                    <Download className="mr-2 h-3.5 w-3.5" />
-                    Download
-                  </Button>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Story...
+                </>
+              ) : (
+                <>
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  <span>Generate Audio</span>
                 </>
               )}
+            </button>
 
-              {isLoadingWords && (
-                <div className="text-xs text-neutral-500 flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading word audio...
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            {audioSrc && (
+              <>
+                <button
+                  onClick={togglePlayPause}
+                  className="px-4 py-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm rounded-full flex items-center gap-2 transition-colors"
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="mr-2 h-3.5 w-3.5" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-3.5 w-3.5" />
+                      Play
+                    </>
+                  )}
+                </button>
 
+                <button
+                  onClick={resetAudio}
+                  className="px-4 py-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm rounded-full flex items-center gap-2 transition-colors"
+                >
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                  <span>Reset</span>
+                </button>
+
+                <select
+                  value={playbackSpeed}
+                  onChange={(e) => handleSpeedChange(e.target.value)}
+                  className="px-4 py-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm rounded-full transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="0.60">Slow (0.75x)</option>
+                  <option value="0.85">Normal (1.0x)</option>
+                  <option value="1.1">Fast (1.25x)</option>
+                </select>
+
+                <button
+                  onClick={downloadAudio}
+                  className="px-4 py-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm rounded-full flex items-center gap-2 transition-colors"
+                >
+                  <Download className="mr-2 h-3.5 w-3.5" />
+                  <span>Download</span>
+                </button>
+              </>
+            )}
+
+            {isLoadingWords && (
+              <div className="text-xs text-neutral-500 flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading word audio...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Story Display Section */}
         {paragraphs.length > 0 && (
-          <Card className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-            <CardContent className="p-6 md:p-8">
-              <div>
-                <div className="space-y-6">
-                  {paragraphs.map((paragraph, pIndex) => {
-                    // Calculate the starting global index for this paragraph
-                    let globalStartIndex = 0;
-                    for (let i = 0; i < pIndex; i++) {
-                      globalStartIndex += paragraphs[i].words.length;
-                    }
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 md:p-8">
+            <div>
+              <div className="space-y-6">
+                {paragraphs.map((paragraph, pIndex) => {
+                  // Calculate the starting global index for this paragraph
+                  let globalStartIndex = 0;
+                  for (let i = 0; i < pIndex; i++) {
+                    globalStartIndex += paragraphs[i].words.length;
+                  }
 
-                    return (
-                      <div key={pIndex} className="flex gap-3 group">
-                        {/* Paragraph play button */}
-                        <button
-                          onClick={() => playParagraph(pIndex)}
-                          className="flex-shrink-0 mt-1 p-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all opacity-0 group-hover:opacity-100"
-                          aria-label={`Play paragraph ${pIndex + 1}`}
-                        >
-                          <Play className="w-3 h-3 text-neutral-600" />
-                        </button>
+                  return (
+                    <div key={pIndex} className="flex gap-3 group">
+                      {/* Paragraph play button */}
+                      <button
+                        onClick={() => playParagraph(pIndex)}
+                        className="flex-shrink-0 mt-1 p-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 transition-all opacity-0 group-hover:opacity-100"
+                        aria-label={`Play paragraph ${pIndex + 1}`}
+                      >
+                        <Play className="w-3 h-3 text-neutral-600" />
+                      </button>
 
-                        {/* Paragraph text */}
-                        <div className="flex-1 text-xl md:text-2xl leading-relaxed text-neutral-700">
-                          {paragraph.words.map((word, wIndex) => {
-                            const globalIndex = globalStartIndex + wIndex;
-                            const globalWord = words[globalIndex];
-                            const isWordLoading = globalWord?.isLoading;
+                      {/* Paragraph text */}
+                      <div className="flex-1 text-xl md:text-2xl leading-relaxed text-neutral-700">
+                        {paragraph.words.map((word, wIndex) => {
+                          const globalIndex = globalStartIndex + wIndex;
+                          const globalWord = words[globalIndex];
+                          const isWordLoading = globalWord?.isLoading;
 
-                            return (
-                              <span
-                                key={wIndex}
-                                onClick={
-                                  generateWords
-                                    ? () => playWordSegment(globalIndex)
-                                    : undefined
-                                }
-                                onMouseEnter={
-                                  generateWords
-                                    ? () => setHoveredWordIndex(globalIndex)
-                                    : undefined
-                                }
-                                onMouseLeave={
-                                  generateWords
-                                    ? () => setHoveredWordIndex(-1)
-                                    : undefined
-                                }
-                                className={`
+                          return (
+                            <span
+                              key={wIndex}
+                              onClick={
+                                generateWords
+                                  ? () => playWordSegment(globalIndex)
+                                  : undefined
+                              }
+                              onMouseEnter={
+                                generateWords
+                                  ? () => setHoveredWordIndex(globalIndex)
+                                  : undefined
+                              }
+                              onMouseLeave={
+                                generateWords
+                                  ? () => setHoveredWordIndex(-1)
+                                  : undefined
+                              }
+                              className={`
                                   inline-block px-2 md:px-3 py-1 md:py-1.5 mx-1 rounded-lg
                                   transition-all duration-200 select-none relative
                                   ${
@@ -1008,33 +982,32 @@ export default function StoryBookPage() {
                                   }
                                   ${isWordLoading ? "opacity-50" : ""}
                                 `}
-                                style={{
-                                  fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                                }}
-                              >
-                                {word.text}
-                                {isWordLoading && (
-                                  <span className="absolute inset-0 flex items-center justify-center">
-                                    <Loader2 className="h-3 w-3 animate-spin text-neutral-500" />
-                                  </span>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
+                              style={{
+                                fontFamily:
+                                  "system-ui, -apple-system, sans-serif",
+                              }}
+                            >
+                              {word.text}
+                              {isWordLoading && (
+                                <span className="absolute inset-0 flex items-center justify-center">
+                                  <Loader2 className="h-3 w-3 animate-spin text-neutral-500" />
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
               {generateWords && (
                 <div className="mt-6 text-center text-xs text-neutral-400">
                   Click any word to hear it
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {audioSrc && <audio ref={audioRef} src={audioSrc} className="hidden" />}
