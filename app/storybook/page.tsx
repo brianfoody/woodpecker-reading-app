@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -67,6 +67,12 @@ export default function StoryBookPage() {
   const continuousPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentPlayingAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentHighlightIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Swipe gesture state
+  const [swipeWords, setSwipeWords] = useState<number[]>([]);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [pointerStart, setPointerStart] = useState<{ x: number; y: number } | null>(null);
 
   // Load story history from local storage on mount
   useEffect(() => {
@@ -747,6 +753,259 @@ export default function StoryBookPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Get client coordinates from mouse or touch event
+  const getClientCoords = (e: React.MouseEvent | React.TouchEvent) => {
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  };
+
+  // Play a sequence of words using paragraph audio
+  const animateWordSequence = useCallback(
+    async (indices: number[]) => {
+      setIsAnimating(true);
+      const sortedIndices = [...indices].sort((a, b) => a - b);
+
+      for (const index of sortedIndices) {
+        // Check if animation was cancelled
+        const shouldContinue = await new Promise<boolean>((resolve) => {
+          setIsAnimating((current: boolean) => {
+            if (!current) {
+              resolve(false);
+              return current;
+            }
+            resolve(true);
+            return current;
+          });
+        });
+
+        if (!shouldContinue) break;
+
+        // Find which paragraph this word belongs to
+        let paragraphIndex = -1;
+        let wordInParagraphIndex = -1;
+        let cumulativeWordCount = 0;
+
+        for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+          const paragraph = paragraphs[pIdx];
+          if (index < cumulativeWordCount + paragraph.words.length) {
+            paragraphIndex = pIdx;
+            wordInParagraphIndex = index - cumulativeWordCount;
+            break;
+          }
+          cumulativeWordCount += paragraph.words.length;
+        }
+
+        if (paragraphIndex === -1 || wordInParagraphIndex === -1) continue;
+
+        const paragraph = paragraphs[paragraphIndex];
+        const word = paragraph.words[wordInParagraphIndex];
+
+        if (!word || !paragraph.audioBase64) continue;
+
+        // Stop any currently playing audio
+        if (currentPlayingAudioRef.current) {
+          currentPlayingAudioRef.current.pause();
+          currentPlayingAudioRef.current = null;
+        }
+
+        setCurrentWordIndex(index);
+
+        try {
+          // Create audio element for this word segment
+          const wordAudio = new Audio(
+            `data:audio/mpeg;base64,${paragraph.audioBase64}`
+          );
+          wordAudio.playbackRate = parseFloat(playbackSpeed);
+          
+          // Set the playback to start at word's start time
+          wordAudio.currentTime = word.startTime;
+          currentPlayingAudioRef.current = wordAudio;
+
+          // Play the audio
+          await wordAudio.play();
+
+          // Create interval to stop at word's end time
+          await new Promise<void>((resolve) => {
+            const checkInterval = setInterval(() => {
+              if (!currentPlayingAudioRef.current || wordAudio.currentTime >= word.endTime) {
+                clearInterval(checkInterval);
+                wordAudio.pause();
+                currentPlayingAudioRef.current = null;
+                resolve();
+              }
+            }, 10);
+
+            // Timeout safety
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              if (currentPlayingAudioRef.current === wordAudio) {
+                wordAudio.pause();
+                currentPlayingAudioRef.current = null;
+              }
+              resolve();
+            }, (word.endTime - word.startTime) * 1000 / parseFloat(playbackSpeed) + 100);
+          });
+
+          // Small pause between words
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+        } catch (error) {
+          console.error(`Failed to play word: ${word.text}`, error);
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      setCurrentWordIndex(-1);
+      setIsAnimating(false);
+    },
+    [paragraphs, playbackSpeed]
+  );
+
+  // Handle pointer start (mouse down or touch start)
+  const handlePointerStart = useCallback(
+    (e: React.MouseEvent | React.TouchEvent, index: number) => {
+      e.stopPropagation();
+      if (isLoading) return;
+
+      const coords = getClientCoords(e);
+      setPointerStart(coords);
+      setSwipeWords([index]);
+      setIsSwiping(true);
+      setIsAnimating(false);
+      
+      // Stop any playing audio
+      if (currentPlayingAudioRef.current) {
+        currentPlayingAudioRef.current.pause();
+        currentPlayingAudioRef.current = null;
+      }
+      if (audioRef.current && isPlaying) {
+        audioRef.current.pause();
+      }
+    },
+    [isLoading, isPlaying]
+  );
+
+  // Handle pointer move (mouse move or touch move)
+  const handlePointerMove = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      if (!pointerStart || !isSwiping) return;
+
+      e.preventDefault();
+
+      const coords = getClientCoords(e);
+      const element = document.elementFromPoint(coords.x, coords.y);
+      const wordElement = element?.closest("[data-word-index]");
+
+      if (wordElement) {
+        const wordIndex = Number.parseInt(
+          wordElement.getAttribute("data-word-index") || "0"
+        );
+        setSwipeWords((prev) => {
+          const newWords = [...prev];
+          if (!newWords.includes(wordIndex)) {
+            const minIndex = Math.min(...newWords);
+            const maxIndex = Math.max(...newWords);
+
+            // Allow adding words that extend the range or fill gaps
+            if (
+              wordIndex === maxIndex + 1 ||
+              wordIndex === minIndex - 1 ||
+              (wordIndex > minIndex && wordIndex < maxIndex)
+            ) {
+              newWords.push(wordIndex);
+            }
+          }
+          return newWords;
+        });
+      }
+    },
+    [pointerStart, isSwiping]
+  );
+
+  // Handle pointer end (mouse up or touch end)
+  const handlePointerEnd = useCallback(async () => {
+    if (isSwiping) {
+      if (swipeWords.length > 1) {
+        // Multiple words - play sequence using paragraph audio
+        animateWordSequence(swipeWords);
+      } else if (swipeWords.length === 1) {
+        // Single tap - play just that word using paragraph audio
+        const index = swipeWords[0];
+        
+        // Find which paragraph this word belongs to
+        let paragraphIndex = -1;
+        let wordInParagraphIndex = -1;
+        let cumulativeWordCount = 0;
+
+        for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+          const paragraph = paragraphs[pIdx];
+          if (index < cumulativeWordCount + paragraph.words.length) {
+            paragraphIndex = pIdx;
+            wordInParagraphIndex = index - cumulativeWordCount;
+            break;
+          }
+          cumulativeWordCount += paragraph.words.length;
+        }
+
+        if (paragraphIndex !== -1 && wordInParagraphIndex !== -1) {
+          const paragraph = paragraphs[paragraphIndex];
+          const word = paragraph.words[wordInParagraphIndex];
+
+          if (word && paragraph.audioBase64) {
+            setCurrentWordIndex(index);
+            
+            try {
+              // Stop any currently playing audio
+              if (currentPlayingAudioRef.current) {
+                currentPlayingAudioRef.current.pause();
+                currentPlayingAudioRef.current = null;
+              }
+
+              const wordAudio = new Audio(
+                `data:audio/mpeg;base64,${paragraph.audioBase64}`
+              );
+              wordAudio.playbackRate = parseFloat(playbackSpeed);
+              wordAudio.currentTime = word.startTime;
+              currentPlayingAudioRef.current = wordAudio;
+
+              await wordAudio.play();
+
+              await new Promise<void>((resolve) => {
+                const checkInterval = setInterval(() => {
+                  if (!currentPlayingAudioRef.current || wordAudio.currentTime >= word.endTime) {
+                    clearInterval(checkInterval);
+                    wordAudio.pause();
+                    currentPlayingAudioRef.current = null;
+                    resolve();
+                  }
+                }, 10);
+
+                setTimeout(() => {
+                  clearInterval(checkInterval);
+                  if (currentPlayingAudioRef.current === wordAudio) {
+                    wordAudio.pause();
+                    currentPlayingAudioRef.current = null;
+                  }
+                  resolve();
+                }, (word.endTime - word.startTime) * 1000 / parseFloat(playbackSpeed) + 100);
+              });
+            } catch (error) {
+              console.error("Error playing word audio:", error);
+            } finally {
+              setTimeout(() => setCurrentWordIndex(-1), 200);
+            }
+          }
+        }
+      }
+      
+      setPointerStart(null);
+      setIsSwiping(false);
+      setTimeout(() => setSwipeWords([]), 300);
+    }
+  }, [swipeWords, isSwiping, animateWordSequence, paragraphs, playbackSpeed]);
+
   return (
     <div className="min-h-screen bg-neutral-50 p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -938,7 +1197,18 @@ export default function StoryBookPage() {
                       </button>
 
                       {/* Paragraph text */}
-                      <div className="flex-1 text-xl md:text-2xl leading-relaxed text-neutral-700">
+                      <div 
+                        className="flex-1 text-xl md:text-2xl leading-relaxed text-neutral-700"
+                        onTouchMove={handlePointerMove}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handlePointerEnd();
+                        }}
+                        onMouseMove={handlePointerMove}
+                        onMouseUp={handlePointerEnd}
+                        onMouseLeave={handlePointerEnd}
+                      >
                         {paragraph.words.map((word, wIndex) => {
                           const globalIndex = globalStartIndex + wIndex;
                           const globalWord = words[globalIndex];
@@ -947,11 +1217,14 @@ export default function StoryBookPage() {
                           return (
                             <span
                               key={wIndex}
+                              data-word-index={globalIndex}
                               onClick={
                                 generateWords
                                   ? () => playWordSegment(globalIndex)
                                   : undefined
                               }
+                              onTouchStart={(e) => handlePointerStart(e, globalIndex)}
+                              onMouseDown={(e) => handlePointerStart(e, globalIndex)}
                               onMouseEnter={
                                 generateWords
                                   ? () => setHoveredWordIndex(globalIndex)
@@ -965,20 +1238,15 @@ export default function StoryBookPage() {
                               className={`
                                   inline-block px-2 md:px-3 py-1 md:py-1.5 mx-1 rounded-lg
                                   transition-all duration-200 select-none relative
-                                  ${
-                                    generateWords
-                                      ? "cursor-pointer"
-                                      : "cursor-default"
-                                  }
+                                  cursor-pointer
                                   ${
                                     globalIndex === currentWordIndex
                                       ? "bg-emerald-600 text-white shadow-lg scale-105"
-                                      : globalIndex === hoveredWordIndex &&
-                                        generateWords
+                                      : swipeWords.includes(globalIndex) && isSwiping
+                                      ? "bg-amber-100 text-amber-900 ring-2 ring-amber-200"
+                                      : globalIndex === hoveredWordIndex && generateWords
                                       ? "bg-neutral-100"
-                                      : generateWords
-                                      ? "hover:bg-neutral-50"
-                                      : ""
+                                      : "hover:bg-neutral-50"
                                   }
                                   ${isWordLoading ? "opacity-50" : ""}
                                 `}
@@ -1001,11 +1269,9 @@ export default function StoryBookPage() {
                   );
                 })}
               </div>
-              {generateWords && (
-                <div className="mt-6 text-center text-xs text-neutral-400">
-                  Click any word to hear it
-                </div>
-              )}
+              <div className="mt-6 text-center text-xs text-neutral-400">
+                Click any word to hear it • Swipe across words to hear them in sequence
+              </div>
             </div>
           </div>
         )}
