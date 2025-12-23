@@ -839,11 +839,11 @@ export default function StoryBookPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mt-4 items-center">
             <button
               onClick={generateAudio}
               disabled={isLoading || !text.trim()}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2 mt-4"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -858,8 +858,20 @@ export default function StoryBookPage() {
               )}
             </button>
 
+            {isLoadingWords && (
+              <div className="text-xs text-neutral-500 flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading word audio...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Story Display Section */}
+        {paragraphs.length > 0 && (
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 md:p-8">
             {audioSrc && (
-              <>
+              <div className="flex flex-wrap gap-3 items-center p-6 md:p-8">
                 <button
                   onClick={togglePlayPause}
                   className="px-4 py-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm rounded-full flex items-center gap-2 transition-colors"
@@ -902,21 +914,9 @@ export default function StoryBookPage() {
                   <Download className="mr-2 h-3.5 w-3.5" />
                   <span>Download</span>
                 </button>
-              </>
-            )}
-
-            {isLoadingWords && (
-              <div className="text-xs text-neutral-500 flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Loading word audio...
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Story Display Section */}
-        {paragraphs.length > 0 && (
-          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 md:p-8">
             <div>
               <div className="space-y-6">
                 {paragraphs.map((paragraph, pIndex) => {
