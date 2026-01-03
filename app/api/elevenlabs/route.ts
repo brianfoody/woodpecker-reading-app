@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { after } from "next/server"; // Available in Next.js 15 RC or experimental
+import { makeS3Client } from "@/lib/s3";
 
 const elevenlabs = new ElevenLabsClient({
   apiKey: process.env.ELEVENLABS_API_KEY,
+});
+
+const s3Client = makeS3Client({
+  config: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accountId: process.env.AWS_ACCOUNT_ID!,
+    bucket: process.env.BUCKET_NAME!,
+    region: "eu-central-1",
+  },
 });
 
 export async function POST(req: NextRequest) {
   try {
     const {
       text,
+      storyId,
       voiceId = "uDsPstFWFBUXjIBimV7s",
       mode = "full",
     } = await req.json();
@@ -106,6 +118,25 @@ export async function POST(req: NextRequest) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
+
+      after(async () => {
+        await s3Client.uploadFile({
+          contents: JSON.stringify({
+            text,
+            words,
+          }),
+          key: `${storyId}/word_metadata.txt`,
+        });
+
+        // await Promise.all(
+        //   words.map((w) => {
+        //     return s3Client.uploadFile({
+        //       contents: w,
+        //       key: `${storyId}/${w}.txt`,
+        //     });
+        //   })
+        // );
+      });
 
       return NextResponse.json({
         words: wordAudios,
@@ -297,6 +328,29 @@ export async function POST(req: NextRequest) {
       // Fallback to using first paragraph if combined generation fails
       mainAudioBase64 = processedParagraphs[0]?.audioBase64 || "";
     }
+
+    after(async () => {
+      await s3Client.uploadFile({
+        contents: JSON.stringify({
+          text,
+          paragraphCount: processedParagraphs.length,
+        }),
+        key: `${storyId}/metadata.txt`,
+      });
+
+      // await Promise.all([
+      //   s3Client.uploadFile({
+      //     contents: mainAudioBase64,
+      //     key: `${storyId}/full.txt`,
+      //   }),
+      //   ...processedParagraphs.map((p, i) => {
+      //     return s3Client.uploadFile({
+      //       contents: mainAudioBase64,
+      //       key: `${storyId}/p${i}.txt`,
+      //     });
+      //   }),
+      // ]);
+    });
 
     return NextResponse.json({
       audioBase64: mainAudioBase64, // Full combined audio for "Play All"
