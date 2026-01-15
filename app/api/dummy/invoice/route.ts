@@ -18,7 +18,7 @@ export async function GET() {
     services: [
       {
         service_date: "2026-01-04",
-        description: "Support at Home – Personal Care",
+        description: "Support at Home - Personal Care",
         hours: 2,
         rate_per_hour: 65.0,
         gst_applicable: true,
